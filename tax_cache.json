@@ -1,0 +1,141 @@
+{
+  "updatedAt": "2026-08-31T19:55:59.967Z",
+  "totalEntries": 3,
+  "entries": {
+    "32091000_SP_MT_SIMPLES_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO": {
+      "cacheKey": "32091000_SP_MT_SIMPLES_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO",
+      "createdAt": "2026-08-31T19:55:35.974Z",
+      "ncm": "3209.10.00",
+      "ufOrigem": "SP",
+      "ufDestino": "MT",
+      "simplesRemetente": true,
+      "porteRemetente": "EPP",
+      "finalidadeCompra": "ORGAO_PUBLICO_CONSUMO",
+      "tipoAdquirente": "ORGAO_PUBLICO_ESTADUAL",
+      "origemAi": false,
+      "jsonResponse": {
+        "status_analise": "SUCESSO",
+        "resumo_fornecedor": {
+          "cnpj": "60701190000104",
+          "porte": "EPP",
+          "optante_simples": true,
+          "impacto_tributario_porte": "Fornecedor enquadrado no EPP (Optante pelo Simples Nacional). CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica ao Simples Nacional. 2) A Nota Fiscal apresentada deve ser emitida pelo VALOR INTEGRAL da proposta, sem desconto de ICMS. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012)."
+        },
+        "enquadramento_produto": {
+          "ncm": "3209.10.00",
+          "descricao": "Tinta acrílica fosca para exteriores galao 18L",
+          "regime_tributario_aplicavel": "Substituição Tributária",
+          "cst_codigo": "500"
+        },
+        "aliquotas": {
+          "aliquota_origem": "7%",
+          "aliquota_interna_mt": "17%",
+          "mva_ou_pauta": "CSOSN 500 (ST Antecipada)"
+        },
+        "fundamentacao_legal": [
+          {
+            "artigo_anexo": "Orientação Técnica nº 03/2026 - CGE/MT & LC 123/2006",
+            "dispositivo": "Cartilha de Execução Financeira CGE-MT / RICMS-MT",
+            "resumo_regra": "Conforme a OT CGE 03/2026, a isenção de ICMS do Art. 65 Anexo IV NÃO se aplica a fornecedores optantes pelo Simples Nacional. A nota é emitida pelo valor integral da proposta, sem desconto de 17% (CSOSN 102 ou 500)."
+          },
+          {
+            "artigo_anexo": "Art. 4º, XI da IN RFB nº 1.234/2012",
+            "dispositivo": "Instrução Normativa RFB nº 1.234/2012",
+            "resumo_regra": "Dispensa de retenção na fonte do IRRF para empresas optantes pelo Simples Nacional nos pagamentos efetuados por órgãos públicos."
+          }
+        ],
+        "orientacao_fiscal": "CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica ao Simples Nacional. 2) A Nota Fiscal apresentada deve ser emitida pelo VALOR INTEGRAL da proposta, sem desconto de ICMS. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012)."
+      }
+    },
+    "22011000_MT_MT_NORMAL_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO": {
+      "cacheKey": "22011000_MT_MT_NORMAL_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO",
+      "createdAt": "2026-08-31T19:55:59.961Z",
+      "ncm": "2201.10.00",
+      "ufOrigem": "MT",
+      "ufDestino": "MT",
+      "simplesRemetente": false,
+      "porteRemetente": "EPP",
+      "finalidadeCompra": "ORGAO_PUBLICO_CONSUMO",
+      "tipoAdquirente": "ORGAO_PUBLICO_ESTADUAL",
+      "origemAi": false,
+      "jsonResponse": {
+        "status_analise": "SUCESSO",
+        "resumo_fornecedor": {
+          "cnpj": "52288400000148",
+          "porte": "EPP",
+          "optante_simples": false,
+          "impacto_tributario_porte": "Fornecedor enquadrado no EPP (Regime Normal). CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não abrange mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de 1.20% (Bens e Mercadorias em Geral (IN 1234 - Cód. 8767)) no pagamento ao fornecedor."
+        },
+        "enquadramento_produto": {
+          "ncm": "2201.10.00",
+          "descricao": "Água mineral retornável igual ou superior a 20 (vinte) litros (ST Anexo X / Bebidas)",
+          "regime_tributario_aplicavel": "Substituição Tributária",
+          "cst_codigo": "60"
+        },
+        "aliquotas": {
+          "aliquota_origem": "12%",
+          "aliquota_interna_mt": "17%",
+          "mva_ou_pauta": "Substituição Tributária (Anexo X MT)"
+        },
+        "fundamentacao_legal": [
+          {
+            "artigo_anexo": "Art. 65, § 3º do Anexo IV do RICMS/MT & OT 03/2026 CGE-MT",
+            "dispositivo": "Decreto nº 2.212/2014-MT / OT 03/2026",
+            "resumo_regra": "Produtos enquadrados no regime de Substituição Tributária (Anexo X) são exceção e NÃO gozam de isenção de ICMS nas vendas a Órgãos Públicos."
+          },
+          {
+            "artigo_anexo": "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
+            "dispositivo": "Instrução Normativa RFB nº 1.234/2012 (Anexo I - Código 8767)",
+            "resumo_regra": "Retenção na fonte obrigatória de IRRF no percentual de 1.20% (Bens e Mercadorias em Geral (IN 1234 - Cód. 8767)) sobre o valor faturado no fornecimento de bens a Órgãos Públicos."
+          }
+        ],
+        "orientacao_fiscal": "CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não abrange mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de 1.20% (Bens e Mercadorias em Geral (IN 1234 - Cód. 8767)) no pagamento ao fornecedor."
+      }
+    },
+    "27111910_MT_MT_NORMAL_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO": {
+      "cacheKey": "27111910_MT_MT_NORMAL_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO",
+      "createdAt": "2026-08-31T19:55:59.967Z",
+      "ncm": "2711.19.10",
+      "ufOrigem": "MT",
+      "ufDestino": "MT",
+      "simplesRemetente": false,
+      "porteRemetente": "EPP",
+      "finalidadeCompra": "ORGAO_PUBLICO_CONSUMO",
+      "tipoAdquirente": "ORGAO_PUBLICO_ESTADUAL",
+      "origemAi": false,
+      "jsonResponse": {
+        "status_analise": "SUCESSO",
+        "resumo_fornecedor": {
+          "cnpj": "52288400000148",
+          "porte": "EPP",
+          "optante_simples": false,
+          "impacto_tributario_porte": "Fornecedor enquadrado no EPP (Regime Normal). CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não abrange mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de 0.24% (GLP (Gás de Cozinha), Combustíveis e Gás Natural (IN 1234 - Cód. 8730)) no pagamento ao fornecedor."
+        },
+        "enquadramento_produto": {
+          "ncm": "2711.19.10",
+          "descricao": "Gás GLP",
+          "regime_tributario_aplicavel": "Substituição Tributária",
+          "cst_codigo": "60"
+        },
+        "aliquotas": {
+          "aliquota_origem": "12%",
+          "aliquota_interna_mt": "17%",
+          "mva_ou_pauta": "Substituição Tributária (Anexo X MT)"
+        },
+        "fundamentacao_legal": [
+          {
+            "artigo_anexo": "Art. 65, § 3º do Anexo IV do RICMS/MT & OT 03/2026 CGE-MT",
+            "dispositivo": "Decreto nº 2.212/2014-MT / OT 03/2026",
+            "resumo_regra": "Produtos enquadrados no regime de Substituição Tributária (Anexo X) são exceção e NÃO gozam de isenção de ICMS nas vendas a Órgãos Públicos."
+          },
+          {
+            "artigo_anexo": "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
+            "dispositivo": "Instrução Normativa RFB nº 1.234/2012 (Anexo I - Código 8730)",
+            "resumo_regra": "Retenção na fonte obrigatória de IRRF no percentual de 0.24% (GLP (Gás de Cozinha), Combustíveis e Gás Natural (IN 1234 - Cód. 8730)) sobre o valor faturado no fornecimento de bens a Órgãos Públicos."
+          }
+        ],
+        "orientacao_fiscal": "CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não abrange mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de 0.24% (GLP (Gás de Cozinha), Combustíveis e Gás Natural (IN 1234 - Cód. 8730)) no pagamento ao fornecedor."
+      }
+    }
+  }
+}

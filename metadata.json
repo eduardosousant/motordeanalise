@@ -1,0 +1,6 @@
+{
+  "name": "Motor de Análise Tributária ICMS-MT (Decreto 2.212/2014)",
+  "description": "Motor de análise tributária especialista no Regulamento do ICMS de Mato Grosso (Decreto nº 2.212/2014-MT), Anexo V, Anexo X, Estimativa Simplificada e DIFAL.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
