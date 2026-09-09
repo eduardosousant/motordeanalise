@@ -5,21 +5,21 @@ export type AppTheme = 'INSTITUCIONAL' | 'FINTECH_PRO' | 'DARK_AUDITOR' | 'GOV_C
 export type TipoAdquirente = "PRIVADO" | "ORGAO_PUBLICO_ESTADUAL";
 
 export type RegimeTributarioProduto =
-  | "Substituição Tributária"
-  | "Estimativa Simplificada"
-  | "Isento"
-  | "TRIBUTAÇÃO NORMAL"
-  | "Isento (Órgão Público Estadual)"
-  | "Simples Nacional (Sem Isenção - OT 03/2026)"
-  | "Substituição Tributária (Sem Isenção - Art. 65 § 3º Anexo IV)"
-  | string;
+    | "Substituição Tributária"
+    | "Estimativa Simplificada"
+    | "Isento"
+    | "TRIBUTAÇÃO NORMAL"
+    | "Isento (Órgão Público Estadual)"
+    | "Simples Nacional (Sem Isenção - OT 03/2026)"
+    | "Substituição Tributária (Sem Isenção - Art. 65 § 3º Anexo IV)"
+    | string;
 
 export type FinalidadeCompra =
-  | "REVENDA"
-  | "USO_CONSUMO"
-  | "ATIVO_IMOBILIZADO"
-  | "INDUSTRIALIZACAO"
-  | "ORGAO_PUBLICO_CONSUMO";
+    | "REVENDA"
+    | "USO_CONSUMO"
+    | "ATIVO_IMOBILIZADO"
+    | "INDUSTRIALIZACAO"
+    | "ORGAO_PUBLICO_CONSUMO";
 
 export interface ResumoFornecedor {
   cnpj: string;
@@ -78,13 +78,18 @@ export interface SimulacaoMemoriaCalculo {
   carga_media_percentual?: number;
   icms_estimativa_simplificada_devido?: number;
   difal_devido?: number;
-  
+
   // Descontos e Benefícios Fiscais
   valor_desconto_comercial?: number;
   desconto_isencao_orgao_publico?: number;
   desconto_reducao_bc_anexo_v?: number;
   economia_tributaria_total?: number;
   valor_liquido_com_desconto?: number;
+
+  // Glosa Administrativa de ICMS (Art. 2º, § 10 da IN RFB nº 1.234/2012)
+  is_glosa_administrativa?: boolean;
+  valor_glosa_icms?: number;
+  base_calculo_irrf_efetiva?: number;
 
   // Retenção do Imposto de Renda na Fonte (IRRF - IN RFB nº 1.234/2012 e STF Tema 1130)
   aplica_irrf_in1234?: boolean;
@@ -99,7 +104,8 @@ export interface SimulacaoMemoriaCalculo {
 }
 
 export interface ItemNotaFiscal {
-  id: string;
+  id?: string;
+  item_numero?: number;
   ncm: string;
   descricao: string;
   quantidade: number;
@@ -109,6 +115,12 @@ export interface ItemNotaFiscal {
   valor_frete?: number;
   valor_despesas?: number;
   icms_proprio_destacado?: number;
+
+  // Campos fiscais extraídos do XML da NF-e
+  cst?: string;
+  csosn?: string;
+  valor_icms_desonerado?: number;
+  motivo_desoneracao?: string;
 }
 
 export interface AnaliseItemFiscal {
@@ -124,6 +136,8 @@ export interface ResumoConsolidadoNota {
   total_frete_despesas: number;
   total_base_calculo: number;
   total_desconto_isencao_icms: number;
+  total_glosa_icms: number;
+  total_base_irrf: number;
   total_economia_reducao_bc: number;
   total_economia_tributaria: number;
   total_irrf_retido: number;

@@ -41,9 +41,24 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
   const [activeTab, setActiveTab] = useState<'EXECUTIVA' | 'GRADE_ITENS' | 'LEGAL' | 'CALCULO' | 'DEBUG'>('EXECUTIVA');
   const [copied, setCopied] = useState(false);
   const temMultiplosItens = Boolean(consolidado && consolidado.itensAnalise && consolidado.itensAnalise.length > 1);
-  const cstInfoSingle = getCstInfo(data, simulacao, data.resumo_fornecedor.optante_simples);
+
+  // Se a mercadoria tiver direito à isenção (ou estiver sob Glosa Administrativa), o parecer técnico SEMPRE sugere CST 40
+  const cstInfoSingle = (simulacao.is_glosa_administrativa || (simulacao.desconto_isencao_orgao_publico && simulacao.desconto_isencao_orgao_publico > 0))
+      ? {
+        codigo: '40',
+        tipo: 'CST' as const,
+        descricao: 'Isenta c/ Desconto Obrigatório',
+        descricaoCompleta: 'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I c/c Convênio ICMS 73/2004)',
+        badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
+      }
+      : getCstInfo(data, simulacao, data.resumo_fornecedor.optante_simples);
 
   const valorBrutoTotal = simulacao.base_calculo_origem + (simulacao.valor_desconto_comercial || 0);
+
+  // Valor pontual de abatimento (sem somar glosa com isenção)
+  const valorAbatimentoEfetivo = simulacao.is_glosa_administrativa
+      ? (simulacao.valor_glosa_icms || 0)
+      : (simulacao.desconto_isencao_orgao_publico || 0);
 
   const getBannerThemeStyles = () => {
     switch (currentTheme) {
@@ -104,25 +119,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
   };
 
   const bannerStyle = getBannerThemeStyles();
-  const jsonString = JSON.stringify(data, null, 2);
-
-  const handleCopyJson = () => {
-    navigator.clipboard.writeText(jsonString);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleDownloadJson = () => {
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analise_tributaria_mt_${data.enquadramento_produto.ncm.replace(/\D/g, '')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   const formatOrientacaoFiscal = (text: string) => {
     if (!text) return '';
@@ -176,24 +172,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 self-start md:self-center">
-            {/*<button
-                onClick={handleCopyJson}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold transition cursor-pointer shadow-sm ${bannerStyle.btnPrimary}`}
-            >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              <span>{copied ? 'Copiado!' : 'Copiar JSON Oficial'}</span>
-            </button>
-
-            <button
-                onClick={handleDownloadJson}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded text-xs font-medium transition cursor-pointer ${bannerStyle.btnSecondary}`}
-            >
-              <Download className="w-4 h-4" />
-              <span>Baixar JSON</span>
-            </button>*/}
-          </div>
         </div>
 
         {/* Tabs Bar */}
@@ -224,19 +202,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                 <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-mono rounded font-bold">Nota Completa</span>
               </button>
           )}
-          {/*
-          <button
-              onClick={() => setActiveTab('JSON')}
-              className={`py-3 px-4 font-semibold text-xs border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer transition ${
-                  activeTab === 'JSON'
-                      ? 'border-teal-700 text-teal-900 bg-white shadow-2xs'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-              }`}
-          >
-            <Code className="w-4 h-4" />
-            <span>JSON Estrito (Regra de Negócio)</span>
-          </button>
-*/}
+
           <button
               onClick={() => setActiveTab('LEGAL')}
               className={`py-3 px-4 font-semibold text-xs border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer transition ${
@@ -260,21 +226,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
             <Scale className="w-4 h-4" />
             <span>Memória de Cálculo (Simulado)</span>
           </button>
-
-          {/*} <button
-              onClick={() => setActiveTab('DEBUG')}
-              className={`py-3 px-4 font-semibold text-xs border-b-2 flex items-center gap-2 whitespace-nowrap cursor-pointer transition ${
-                  activeTab === 'DEBUG'
-                      ? 'border-amber-600 text-amber-900 bg-amber-50/50 shadow-2xs'
-                      : 'border-transparent text-slate-600 hover:text-amber-900 hover:bg-amber-100/50'
-              }`}
-          >
-            <Calculator className="w-4 h-4 text-amber-700" />
-            <span className="flex items-center gap-1.5">
-            <span>Memória Detalhada (Debug View)</span>
-            <span className="px-1.5 py-0.2 bg-amber-200/70 text-amber-900 text-[9px] font-mono rounded font-bold uppercase">Auditoria</span>
-          </span>
-          </button> */}
         </div>
 
         {/* Tab Content */}
@@ -296,7 +247,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
               </span>
                 </div>
 
-                {/* Cards de Totais da Operação com Desconto Comercial */}
+                {/* Cards de Totais da Operação com Desconto Comercial / Glosa */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                   <div className="bg-white border-l-4 border-slate-700 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
                     <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block tracking-wider">Total Produtos Bruto</span>
@@ -306,15 +257,22 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                     <span className="text-[10.5px] text-slate-500 block mt-0.5">Valor faturado</span>
                   </div>
 
-                  <div className="bg-white border-l-4 border-amber-500 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                    <span className="text-[10px] font-mono uppercase text-amber-800 font-semibold block tracking-wider">Desconto (Comercial / Isenção)</span>
+                  {/* CARD DE GLOSA / DESCONTO */}
+                  <div className={`bg-white border-l-4 ${simulacao.is_glosa_administrativa ? 'border-amber-600' : 'border-amber-500'} border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs`}>
+                <span className="text-[10px] font-mono uppercase text-amber-800 font-semibold block tracking-wider">
+                  {simulacao.is_glosa_administrativa ? 'Glosa Administrativa ICMS' : 'Desconto (Comercial / Isenção)'}
+                </span>
                     <span className="text-sm sm:text-base font-bold text-amber-700 mt-1 block font-mono">
-                  {((simulacao.valor_desconto_comercial || 0) + (simulacao.desconto_isencao_orgao_publico || 0)) > 0
-                      ? `- ${((simulacao.valor_desconto_comercial || 0) + (simulacao.desconto_isencao_orgao_publico || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                      : 'R$ 0,00'}
+                  {simulacao.is_glosa_administrativa
+                      ? `- ${(simulacao.valor_glosa_icms || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                      : (((simulacao.valor_desconto_comercial || 0) + (simulacao.desconto_isencao_orgao_publico || 0)) > 0
+                          ? `- ${((simulacao.valor_desconto_comercial || 0) + (simulacao.desconto_isencao_orgao_publico || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                          : 'R$ 0,00')}
                 </span>
                     <span className="text-[10.5px] text-slate-500 block mt-0.5">
-                  {simulacao.valor_desconto_comercial ? `Desc. Comercial: R$ ${simulacao.valor_desconto_comercial.toFixed(2)}` : (simulacao.desconto_isencao_orgao_publico ? 'Art. 2º Anexo I (17%)' : 'Sem desconto')}
+                  {simulacao.is_glosa_administrativa
+                      ? 'Glosa de 17% (IN RFB 1.234/12)'
+                      : (simulacao.desconto_isencao_orgao_publico ? 'Art. 2º Anexo I (17%)' : 'Sem abatimento')}
                 </span>
                   </div>
 
@@ -324,7 +282,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                   {simulacao.valor_irrf_retido ? `- ${(simulacao.valor_irrf_retido).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : 'R$ 0,00'}
                 </span>
                     <span className="text-[10.5px] text-slate-500 block mt-0.5">
-                  Sobre R$ {simulacao.base_calculo_origem.toFixed(2)} ({simulacao.aliquota_irrf_in1234 !== undefined ? `${simulacao.aliquota_irrf_in1234}%` : '1,20%'})
+                  Sobre R$ {(simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem).toFixed(2)} ({simulacao.aliquota_irrf_in1234 !== undefined ? `${simulacao.aliquota_irrf_in1234}%` : '1,20%'})
                 </span>
                   </div>
 
@@ -401,7 +359,9 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                           <span className="text-sm font-bold font-mono text-amber-300">
                       - R$ {(simulacao.valor_irrf_retido || 0).toFixed(2)}
                     </span>
-                          <span className="text-[10px] text-slate-400 block mt-0.5">Calculado sobre R$ {simulacao.base_calculo_origem.toFixed(2)}</span>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Calculado sobre R$ {(simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem).toFixed(2)}
+                    </span>
                         </div>
                         <div className="bg-slate-800/80 p-3 rounded border border-slate-700">
                           <span className="text-[10px] text-slate-400 block font-mono">Valor Líquido a Pagar ao Fornecedor:</span>
@@ -411,11 +371,22 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                           <span className="text-[10px] text-slate-400 block mt-0.5">Desembolso Financeiro Efetivo</span>
                         </div>
                       </div>
-                      {simulacao.justificativa_irrf_in1234 && (
+
+                      {/* Bloco de Fundamentação Legal de Retenção com regra expressa do Art. 2º, § 10 da IN 1.234/12 */}
+                      {simulacao.is_glosa_administrativa ? (
+                          <div className="bg-amber-950/60 border border-amber-500/40 p-2.5 rounded text-amber-200 text-xs mt-2 space-y-1">
+                            <strong className="text-amber-300 block font-mono text-[11px] uppercase tracking-wider">
+                              Instrução Normativa RFB nº 1.234/2012, Art. 2º, § 10:
+                            </strong>
+                            <p className="italic text-[11.5px] leading-relaxed text-amber-100">
+                              “§ 10. Em caso de pagamentos com glosa de valores constantes da nota fiscal, sem emissão de nova nota fiscal, a retenção deverá incidir sobre o valor original da nota.”
+                            </p>
+                          </div>
+                      ) : simulacao.justificativa_irrf_in1234 ? (
                           <p className="text-[11px] text-slate-300 pt-1 font-sans italic border-t border-slate-800">
                             <strong>Fundamentação de Retenção:</strong> {simulacao.justificativa_irrf_in1234}
                           </p>
-                      )}
+                      ) : null}
                     </div>
                 )}
               </div>
@@ -434,9 +405,9 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                   </div>
 
                   <div className="bg-white border-l-4 border-amber-500 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                    <span className="text-[10px] font-mono uppercase text-amber-800 font-semibold block tracking-wider">Desconto Comercial / Isenção</span>
+                    <span className="text-[10px] font-mono uppercase text-amber-800 font-semibold block tracking-wider">Desconto Comercial / Glosa</span>
                     <span className="text-sm sm:text-base font-bold text-amber-700 mt-1 block font-mono">
-                  - {(consolidado.resumoConsolidado.total_desconto_comercial + consolidado.resumoConsolidado.total_desconto_isencao_icms).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  - {(consolidado.resumoConsolidado.total_desconto_comercial + consolidado.resumoConsolidado.total_desconto_isencao_icms + consolidado.resumoConsolidado.total_glosa_icms).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
                     <span className="text-[10.5px] text-slate-500 block mt-0.5">
                   Comercial: {consolidado.resumoConsolidado.total_desconto_comercial.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -494,7 +465,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         <th className="py-3 px-3 text-right">Valor Bruto</th>
                         <th className="py-3 px-3 text-right text-amber-800">Desc. Com.</th>
                         <th className="py-3 px-3">Regime MT</th>
-                        <th className="py-3 px-3 text-right text-amber-800">Desc. Isenção</th>
+                        <th className="py-3 px-3 text-right text-amber-800">Desc./Glosa ICMS</th>
                         <th className="py-3 px-3 text-right text-sky-800">IRRF</th>
                         <th className="py-3 px-3 text-right text-emerald-800">Líquido Item</th>
                         <th className="py-3 px-3 text-right">ICMS MT</th>
@@ -505,11 +476,21 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         const item = itemAnalise.item;
                         const sim = itemAnalise.simulacao;
                         const resp = itemAnalise.jsonResponse;
-                        const cstInfo = getCstInfo(resp, sim, data.resumo_fornecedor?.optante_simples);
+                        const cstInfo = (sim.is_glosa_administrativa || (sim.desconto_isencao_orgao_publico && sim.desconto_isencao_orgao_publico > 0))
+                            ? {
+                              codigo: '40',
+                              tipo: 'CST' as const,
+                              descricao: 'Isenta c/ Desconto Obrigatório',
+                              descricaoCompleta: 'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I c/c Convênio 73/2004)',
+                              badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                            }
+                            : getCstInfo(resp, sim, data.resumo_fornecedor?.optante_simples);
+
                         const valorBrutoItem = (item.quantidade || 1) * (item.valor_unitario || 0);
                         const liquidoItem = sim.valor_liquido_pagamento_fornecedor !== undefined
                             ? sim.valor_liquido_pagamento_fornecedor
                             : (sim.valor_liquido_com_desconto !== undefined ? sim.valor_liquido_com_desconto : valorBrutoItem);
+                        const abatimentoItem = (sim.desconto_isencao_orgao_publico || 0) + (sim.valor_glosa_icms || 0);
 
                         return (
                             <tr key={item.id || idx} className="hover:bg-slate-50 transition">
@@ -556,8 +537,8 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                             </span>
                               </td>
                               <td className="py-3 px-3 text-right font-mono text-amber-700 font-bold">
-                                {sim.desconto_isencao_orgao_publico && sim.desconto_isencao_orgao_publico > 0
-                                    ? `- ${sim.desconto_isencao_orgao_publico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                                {abatimentoItem > 0
+                                    ? `- ${abatimentoItem.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
                                     : '-'}
                               </td>
                               <td className="py-3 px-3 text-right font-mono text-sky-700 font-bold">
@@ -588,7 +569,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         </td>
                         <td></td>
                         <td className="py-3.5 px-3 text-right font-mono text-amber-800">
-                          - {consolidado.resumoConsolidado.total_desconto_isencao_icms.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          - {(consolidado.resumoConsolidado.total_desconto_isencao_icms + consolidado.resumoConsolidado.total_glosa_icms).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </td>
                         <td className="py-3.5 px-3 text-right font-mono text-sky-800">
                           - {consolidado.resumoConsolidado.total_irrf_retido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -606,26 +587,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                 </div>
               </div>
           )}
-          {/*
-          {activeTab === 'JSON' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-slate-600 font-mono font-semibold">
-                  <p>RESULTADO_ENGINE.json</p>
-                  <button
-                      onClick={handleCopyJson}
-                      className="text-teal-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Copy className="w-3.5 h-3.5" /> Copiar Código JSON
-                  </button>
-                </div>
-                <div className="border border-slate-800 rounded-lg bg-slate-900 p-4 font-mono text-[11px] relative overflow-hidden shadow-inner">
-              <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed max-h-[500px] overflow-y-auto">
-                {jsonString}
-              </pre>
-                </div>
-              </div>
-          )}
-*/}
+
           {activeTab === 'LEGAL' && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-2 gap-2">
@@ -667,19 +629,39 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {data.fundamentacao_legal.map((item, idx) => (
-                      <div key={idx} className="p-4 bg-white border border-slate-200 rounded-lg shadow-2xs space-y-1.5">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="font-mono text-xs text-teal-800 font-bold underline decoration-teal-300">
-                      {item.artigo_anexo}
-                    </span>
-                          <span className="text-[10px] font-mono text-slate-500 font-semibold">{item.dispositivo}</span>
+                  {data.fundamentacao_legal.map((item, idx) => {
+                    const isDispositivoIrrf = item.artigo_anexo.includes('1.234') || item.dispositivo.includes('1.234');
+                    const usarTextoGlosa = isDispositivoIrrf && simulacao.is_glosa_administrativa;
+
+                    return (
+                        <div
+                            key={idx}
+                            className={`p-4 rounded-lg shadow-2xs space-y-1.5 border ${
+                                usarTextoGlosa ? 'bg-amber-50/70 border-amber-300' : 'bg-white border-slate-200'
+                            }`}
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <span
+                          className={`font-mono text-xs font-bold underline ${
+                              usarTextoGlosa ? 'text-amber-900 decoration-amber-400' : 'text-teal-800 decoration-teal-300'
+                          }`}
+                      >
+                        {usarTextoGlosa ? 'IN RFB nº 1.234/2012, Art. 2º, § 10' : item.artigo_anexo}
+                      </span>
+                            <span className="text-[10px] font-mono text-slate-500 font-semibold">{item.dispositivo}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 leading-relaxed pt-1 font-sans">
+                            {usarTextoGlosa ? (
+                                <span className="italic font-medium text-amber-950">
+                          “§ 10. Em caso de pagamentos com glosa de valores constantes da nota fiscal, sem emissão de nova nota fiscal, a retenção deverá incidir sobre o valor original da nota.”
+                        </span>
+                            ) : (
+                                item.resumo_regra
+                            )}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-700 leading-relaxed pt-1 font-sans">
-                          {item.resumo_regra}
-                        </p>
-                      </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
           )}
@@ -747,17 +729,28 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                       </div>
                   )}
 
-                  {simulacao.desconto_isencao_orgao_publico !== undefined ? (
+                  {/* Bloco de Compras Públicas: Diferenciação entre Glosa, Isenção Formal e ST/Simples */}
+                  {simulacao.is_glosa_administrativa ? (
                       <div className="bg-amber-50 border border-amber-300 p-3.5 rounded text-amber-950 space-y-1.5 my-2 font-sans">
                         <div className="flex justify-between font-bold text-amber-900 font-mono text-xs">
+                          <span>🏛️ COMPRA PÚBLICA ESTADUAL — GLOSA ADMINISTRATIVA (IN RFB nº 1.234/2012):</span>
+                          <span className="text-sm">- R$ {(simulacao.valor_glosa_icms || 0).toFixed(2)}</span>
+                        </div>
+                        <p className="text-[11px] text-amber-950 leading-relaxed">
+                          <strong>Orientação de Execução Financeira:</strong> Produto fora da ST com direito à isenção (Art. 2º Anexo I / Art. 65 Anexo IV do RICMS/MT), porém a NF-e foi emitida sem a dedução formal (CST 00/sem vICMSDeson)[cite: 3]. O Órgão Público deve realizar a <strong>glosa administrativa de 17%</strong> na liquidação da fatura. Conforme <strong>Art. 2º, § 10 da IN RFB nº 1.234/2012</strong>, a retenção de IRRF deve incidir sobre o <strong>valor original da nota</strong>.
+                        </p>
+                      </div>
+                  ) : (simulacao.desconto_isencao_orgao_publico !== undefined && !cstInfoSingle.codigo.includes('60') && !cstInfoSingle.codigo.includes('500') && !data.resumo_fornecedor.optante_simples) ? (
+                      <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded text-emerald-950 space-y-1.5 my-2 font-sans">
+                        <div className="flex justify-between font-bold text-emerald-900 font-mono text-xs">
                           <span>🏛️ ISENÇÃO ICMS ÓRGÃO PÚBLICO ESTADUAL (Conv. 73/04 & Art. 2º Anexo I):</span>
                           <span className="text-sm">- R$ {simulacao.desconto_isencao_orgao_publico.toFixed(2)}</span>
                         </div>
-                        <p className="text-[11px] text-amber-900/90 leading-relaxed">
+                        <p className="text-[11px] text-emerald-900/90 leading-relaxed">
                           <strong>Dedução Obrigatória no Preço:</strong> O valor de R$ {simulacao.desconto_isencao_orgao_publico.toFixed(2)} relativo ao ICMS dispensado deve ser abatido do valor final do bem/fatura do Órgão Público de Mato Grosso e informado na NF-e como <code>vICMSDesonerado</code>.
                         </p>
                       </div>
-                  ) : data.enquadramento_produto.regime_tributario_aplicavel.includes('Sem Isenção') || data.enquadramento_produto.regime_tributario_aplicavel.includes('Órgão Público') ? (
+                  ) : data.enquadramento_produto.regime_tributario_aplicavel.includes('Sem Isenção') || data.enquadramento_produto.regime_tributario_aplicavel.includes('Órgão Público') || cstInfoSingle.codigo === '60' || cstInfoSingle.codigo === '500' ? (
                       <div className="bg-blue-50 border border-blue-200 p-3.5 rounded text-blue-950 space-y-1.5 my-2 font-sans">
                         <div className="flex justify-between font-bold text-blue-900 font-mono text-xs">
                           <span>🏛️ COMPRA PÚBLICA ESTADUAL — ISENÇÃO INAPLICÁVEL (OT nº 03/2026 CGE-MT):</span>
@@ -843,7 +836,7 @@ Fornecedor: ${data.resumo_fornecedor.cnpj} (${data.resumo_fornecedor.optante_sim
 1. Total Bruto Faturado: R$ ${valorBrutoTotal.toFixed(2)}
 ${simulacao.valor_desconto_comercial ? `2. Desconto Comercial: - R$ ${simulacao.valor_desconto_comercial.toFixed(2)}\n3. Base Líquida: R$ ${simulacao.base_calculo_origem.toFixed(2)}` : `2. Base de Cálculo da Operação: R$ ${simulacao.base_calculo_origem.toFixed(2)}`}
 4. ICMS Destacado na Origem (${data.aliquotas.aliquota_origem || '7%'}): R$ ${simulacao.icms_origem_destacado.toFixed(2)}
-${simulacao.desconto_isencao_orgao_publico !== undefined ? `5. Desoneração ICMS Órgão Público: - R$ ${simulacao.desconto_isencao_orgao_publico.toFixed(2)}` : ''}
+${simulacao.is_glosa_administrativa ? `5. Glosa Administrativa de ICMS: - R$ ${(simulacao.valor_glosa_icms || 0).toFixed(2)}` : (simulacao.desconto_isencao_orgao_publico !== undefined ? `5. Desoneração ICMS Órgão Público: - R$ ${simulacao.desconto_isencao_orgao_publico.toFixed(2)}` : '')}
 ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquota_irrf_in1234}% - Cód. ${simulacao.codigo_retencao_irrf}): - R$ ${(simulacao.valor_irrf_retido || 0).toFixed(2)}` : '6. Retenção IRRF IN 1234: DISPENSADO (Simples Nacional)'}
 7. Valor Líquido Fornecedor: R$ ${(simulacao.valor_liquido_pagamento_fornecedor || (simulacao.base_calculo_origem - (simulacao.valor_irrf_retido || 0))).toFixed(2)}
 8. Total Recolher SEFAZ/MT: R$ ${simulacao.total_recolher_mt.toFixed(2)}`;
@@ -937,7 +930,7 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                         <td className="py-3 px-4 font-semibold text-teal-950">
                           3. Base de Cálculo Efetiva (Líquida)
                           <span className="block text-[10px] font-normal text-teal-800 font-sans">
-                          Base de cálculo para incidência de ICMS e IRRF
+                          Base de cálculo para apuração da operação
                         </span>
                         </td>
                         <td className="py-3 px-4 text-right font-bold text-teal-900">
@@ -959,17 +952,46 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                         </td>
                       </tr>
 
+                      {/* Linha: Glosa Administrativa de ICMS */}
+                      {simulacao.is_glosa_administrativa && (
+                          <tr className="hover:bg-amber-50/50 transition bg-amber-50/20">
+                            <td className="py-3 px-4 font-semibold text-amber-950">
+                              4. Glosa Administrativa de ICMS (Art. 2º, § 10 IN 1.234/12)
+                              <span className="block text-[10px] font-normal text-amber-800 font-sans">
+                            Corte financeiro de 17% por falta de desoneração formal na NF-e
+                          </span>
+                            </td>
+                            <td className="py-3 px-4 text-right text-amber-900 font-bold">
+                              R$ {simulacao.base_calculo_origem.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-center font-bold text-amber-900">
+                              17,00%
+                            </td>
+                            <td className="py-3 px-4 text-right font-bold text-amber-950">
+                              - R$ {(simulacao.valor_glosa_icms || 0).toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-950 rounded text-[10px] font-semibold border border-amber-300">
+                            Glosa na Fatura
+                          </span>
+                            </td>
+                            <td className="py-3 px-4 text-[11px] font-sans text-amber-900">
+                              Art. 65 Anexo IV RICMS/MT
+                            </td>
+                          </tr>
+                      )}
+
                       {/* Linha: Retenção na Fonte de IRRF */}
                       {simulacao.aplica_irrf_in1234 !== undefined && (
                           <tr className={`hover:bg-sky-50/50 transition ${simulacao.aplica_irrf_in1234 ? 'bg-sky-50/30' : 'bg-slate-50/40'}`}>
                             <td className="py-3 px-4 font-semibold text-sky-950">
-                              4. Retenção na Fonte de IRRF (IN RFB nº 1.234/2012)
+                              {simulacao.is_glosa_administrativa ? '5.' : '4.'} Retenção na Fonte de IRRF (IN RFB nº 1.234/2012)
                               <span className="block text-[10px] font-normal text-sky-800 font-sans">
                             {simulacao.categoria_irrf_in1234 || 'Aquisição de Bens por Órgão Público'}
                           </span>
                             </td>
                             <td className="py-3 px-4 text-right text-sky-900 font-bold">
-                              R$ {simulacao.base_calculo_origem.toFixed(2)}
+                              R$ {(simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem).toFixed(2)}
                             </td>
                             <td className="py-3 px-4 text-center font-bold text-sky-900">
                               {simulacao.aplica_irrf_in1234 ? `${(simulacao.aliquota_irrf_in1234 || 1.2).toFixed(2)}%` : '0,00%'}
@@ -990,7 +1012,7 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                           </span>
                             </td>
                             <td className="py-3 px-4 text-[11px] font-sans text-sky-900">
-                              IN RFB 1.234/2012 & STF Tema 1130
+                              {simulacao.is_glosa_administrativa ? 'Art. 2º, § 10 IN 1.234/12' : 'Art. 3º-A IN 1.234/12'}
                             </td>
                           </tr>
                       )}
@@ -998,9 +1020,9 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                       {/* Linha: VALOR LÍQUIDO AO FORNECEDOR */}
                       <tr className="bg-emerald-50/50 hover:bg-emerald-50 transition border-t-2 border-slate-300">
                         <td className="py-3.5 px-4 font-bold text-emerald-950">
-                          5. VALOR LÍQUIDO A PAGAR AO FORNECEDOR
+                          {simulacao.is_glosa_administrativa ? '6.' : '5.'} VALOR LÍQUIDO A PAGAR AO FORNECEDOR
                           <span className="block text-[10px] font-normal text-emerald-800 font-sans">
-                          Valor faturado deduzidas eventuais desonerações de ICMS e a retenção de IRRF
+                          Valor faturado deduzida a glosa/desoneração do ICMS e a retenção de IRRF
                         </span>
                         </td>
                         <td className="py-3.5 px-4 text-right font-bold text-slate-700">
@@ -1047,6 +1069,14 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                             <span>(+) IRRF Recolhido via DARF (RFB):</span>
                             <span className="font-bold text-sky-700">
                         R$ {simulacao.valor_irrf_retido.toFixed(2)}
+                      </span>
+                          </div>
+                      )}
+                      {simulacao.is_glosa_administrativa && (
+                          <div className="flex justify-between">
+                            <span>(+) Glosa ICMS Retida no Tesouro:</span>
+                            <span className="font-bold text-amber-800">
+                        R$ {(simulacao.valor_glosa_icms || 0).toFixed(2)}
                       </span>
                           </div>
                       )}

@@ -1,22 +1,36 @@
-import { OperacaoComercial, AnaliseTributariaJSON, SimulacaoMemoriaCalculo, ItemNotaFiscal, AnaliseConsolidadaNota, AnaliseItemFiscal, ResumoConsolidadoNota } from '../types.js';
+import {
+  OperacaoComercial,
+  AnaliseTributariaJSON,
+  SimulacaoMemoriaCalculo,
+  ItemNotaFiscal,
+  AnaliseConsolidadaNota,
+  AnaliseItemFiscal,
+  ResumoConsolidadoNota
+} from '../types.js';
 import { verificarNcmNoAnexoX, consultarNcmOficialMT } from '../data/ncmDatabase.js';
 
 export function checkProductSt(ncmInput: string, _descricaoInput?: string): boolean {
   return verificarNcmNoAnexoX(ncmInput);
 }
 
-/**
- * Árvore de Decisão Determinística e Genérica de Enquadramento Tributário por Linha de Produto
- * Sem regras manuais ou fixas por nome de produto.
- */
 export function calcularEnquadramentoItem(
-    item: { ncm: string; valorTotal: number; descricao?: string; [key: string]: any },
+    item: {
+      ncm: string;
+      valorTotal: number;
+      descricao?: string;
+      valor_icms_desonerado?: number;
+      cst?: string;
+      [key: string]: any;
+    },
     fornecedor: { isSimplesNacional: boolean; [key: string]: any },
     adquirente: { tipo?: string; [key: string]: any }
 ): {
   cst: string;
   regimeMt: string;
   descIsencao: number;
+  valorGlosaIcms: number;
+  isGlosaAdministrativa: boolean;
+  baseCalculoIrrf: number;
   irrf: number;
   liquidoItem: number;
   isST: boolean;
@@ -24,7 +38,6 @@ export function calcularEnquadramentoItem(
   aliquotaIrrf: number;
   totalRecolherMt: number;
 } {
-  // 1. a) Consulta o NCM na base completa (Anexo X MT e Tabela de Retenções RFB)
   const dadosNcm = consultarNcmOficialMT(item.ncm, item.descricao);
   const isST = dadosNcm.isSt;
   const valorTotal = Number(item.valorTotal) || 0;
@@ -32,83 +45,106 @@ export function calcularEnquadramentoItem(
   let cst = '00';
   let regimeMt = 'Tributação Normal';
   let descIsencao = 0.00;
+  let valorGlosaIcms = 0.00;
+  let isGlosaAdministrativa = false;
+  let baseCalculoIrrf = valorTotal;
   let irrf = 0.00;
-  let aliquotaIcmsDestacada = 0;
+  let aliquotaIcmsDestacada = 0.00;
 
-  // Alíquota de IRRF dinâmica vinda da base de NCMs (0.24% p/ combustíveis/GLP ou 1.20% p/ mercadorias)
   const aliquotaIrrfPercentual = dadosNcm.irrf !== undefined ? dadosNcm.irrf : 1.20;
   const aliquotaIrrfDecimal = aliquotaIrrfPercentual / 100;
-
   const isOrgaoPublicoMT = (adquirente.tipo === 'ORGAO_PUBLICO_ESTADUAL');
 
-  // 1. c) Fornecedor do SIMPLES NACIONAL (CRT 1)
+  // 1. Fornecedor do SIMPLES NACIONAL (CRT 1)
   if (fornecedor.isSimplesNacional) {
     if (!isST) {
       cst = '102';
       regimeMt = 'Tributação Normal Simples';
-      descIsencao = 0.00;
-      irrf = 0.00;
-      aliquotaIcmsDestacada = 0.00;
     } else {
       cst = '500';
       regimeMt = 'Substituição Tributária';
-      descIsencao = 0.00;
-      irrf = 0.00;
-      aliquotaIcmsDestacada = 0.00;
     }
+    descIsencao = 0.00;
+    valorGlosaIcms = 0.00;
+    isGlosaAdministrativa = false;
+    baseCalculoIrrf = valorTotal;
+    irrf = 0.00;
+    aliquotaIcmsDestacada = 0.00;
   }
-  // 1. b) Fornecedor do REGIME NORMAL (CRT 3) e Destinatário ÓRGÃO PÚBLICO ESTADUAL DE MT
+  // 2. Fornecedor do REGIME NORMAL e Destinatário ÓRGÃO PÚBLICO ESTADUAL DE MT
   else if (isOrgaoPublicoMT) {
     if (!isST) {
-      // Produto fora do Anexo X (Isenção com desconto obrigatório de ICMS de 17%)
-      cst = '40';
       regimeMt = 'Isento (Órgão Público MT)';
-      descIsencao = valorTotal * 0.17;
+      const valorIcmsIsentoCalculado = valorTotal * 0.17;
+
+      const cstInformado = item.cst;
+      const temDesoneracaoFormalXml = (Number(item.valor_icms_desonerado) || 0) > 0 || cstInformado === '40';
+
+      // O CST SUGERIDO pelo parecer técnico é SEMPRE 40 (Isenção Art. 2º Anexo I / Conv. 73/04)
+      cst = '40';
+
+      if (temDesoneracaoFormalXml) {
+        // Cenário A: Desoneração formal na NF-e (Art. 3º-A da IN RFB 1.234/2012)
+        descIsencao = Number(item.valor_icms_desonerado) || valorIcmsIsentoCalculado;
+        valorGlosaIcms = 0.00;
+        isGlosaAdministrativa = false;
+        baseCalculoIrrf = Math.max(0, valorTotal - descIsencao);
+        irrf = baseCalculoIrrf * aliquotaIrrfDecimal;
+      } else {
+        // Cenário B: NF-e emitida com CST 00 / sem vICMSDeson -> GLOSA ADMINISTRATIVA
+        // NÃO soma descIsencao para evitar duplicidade com valorGlosaIcms
+        descIsencao = 0.00;
+        valorGlosaIcms = valorIcmsIsentoCalculado;
+        isGlosaAdministrativa = true;
+        baseCalculoIrrf = valorTotal; // Art. 2º, § 10 da IN RFB 1.234/12
+        irrf = baseCalculoIrrf * aliquotaIrrfDecimal;
+      }
       aliquotaIcmsDestacada = 0.00;
-      // Retenção do IRRF sobre o valor líquido faturado após o desconto do ICMS desonerado
-      const baseAposDesconto = Math.max(0, valorTotal - descIsencao);
-      irrf = baseAposDesconto * aliquotaIrrfDecimal;
     } else {
-      // Produto no Anexo X com ST retida anteriormente (sem desconto de isenção de ICMS)
       cst = '60';
       regimeMt = 'Substituição Tributária';
       descIsencao = 0.00;
+      valorGlosaIcms = 0.00;
+      isGlosaAdministrativa = false;
+      baseCalculoIrrf = valorTotal;
+      irrf = baseCalculoIrrf * aliquotaIrrfDecimal;
       aliquotaIcmsDestacada = 0.00;
-      // Retenção do IRRF sobre a base integral faturada
-      irrf = valorTotal * aliquotaIrrfDecimal;
     }
   }
-  // 1. d) Venda para CONSUMIDOR FINAL COMUM / CONTRIBUINTE NORMAL (Não Órgão Público)
+  // 3. Venda para CONSUMIDOR FINAL COMUM
   else {
     if (!isST) {
       cst = '00';
       regimeMt = 'Tributação Normal';
-      descIsencao = 0.00;
-      irrf = 0.00;
       aliquotaIcmsDestacada = 0.17;
     } else {
       cst = '60';
       regimeMt = 'Substituição Tributária';
-      descIsencao = 0.00;
-      irrf = 0.00;
       aliquotaIcmsDestacada = 0.00;
     }
+    descIsencao = 0.00;
+    valorGlosaIcms = 0.00;
+    isGlosaAdministrativa = false;
+    baseCalculoIrrf = valorTotal;
+    irrf = 0.00;
   }
 
-  // Líquido do Item: Valor Total - Desconto Isenção MT - Retenção IRRF
-  const liquidoItem = Math.max(0, valorTotal - descIsencao - irrf);
-  const totalRecolherMt = 0.00;
+  const abatimentoTotal = isGlosaAdministrativa ? valorGlosaIcms : descIsencao;
+  const liquidoItem = Math.max(0, valorTotal - abatimentoTotal - irrf);
 
   return {
     cst,
     regimeMt,
     descIsencao,
+    valorGlosaIcms,
+    isGlosaAdministrativa,
+    baseCalculoIrrf,
     irrf,
     liquidoItem,
     isST,
     aliquotaIcmsDestacada,
     aliquotaIrrf: irrf > 0 ? aliquotaIrrfPercentual : 0.00,
-    totalRecolherMt
+    totalRecolherMt: 0.00
   };
 }
 
@@ -142,7 +178,6 @@ export function getIrrfClassification(ncm: string, descricao?: string): {
     };
   }
 
-  // Se o NCM tem alíquota cadastrada de 0,24% no mapa de dados (Combustíveis/GLP)
   if (dadosNcm.irrf === 0.24 || ncmClean.startsWith('2710') || ncmClean.startsWith('2711')) {
     return {
       aliquota: 0.24,
@@ -170,8 +205,16 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
   const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
   const isOrgaoPublico = tipoAdquirente === 'ORGAO_PUBLICO_ESTADUAL';
 
+  const primeiroItem = op.itens && op.itens.length > 0 ? op.itens[0] : null;
+
   const enq = calcularEnquadramentoItem(
-      { ncm: op.ncm, valorTotal, descricao: op.descricao_produto },
+      {
+        ncm: op.ncm,
+        valorTotal,
+        descricao: op.descricao_produto,
+        valor_icms_desonerado: primeiroItem?.valor_icms_desonerado,
+        cst: primeiroItem?.cst
+      },
       { isSimplesNacional: isSimples },
       { tipo: tipoAdquirente }
   );
@@ -184,20 +227,34 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
 
   const irrfClass = getIrrfClassification(op.ncm, op.descricao_produto);
 
+  let justificativaIrrfFinal = '';
+  if (isSimples) {
+    justificativaIrrfFinal = 'Dispensa de retenção na fonte do IRRF: Fornecedor optante pelo Simples Nacional (Art. 4º, inciso XI da Instrução Normativa RFB nº 1.234/2012).';
+  } else if (enq.isGlosaAdministrativa) {
+    justificativaIrrfFinal = `Pagamento efetuado com GLOSA ADMINISTRATIVA do ICMS indevido (R$ ${enq.valorGlosaIcms.toFixed(2)}), sem emissão de nova nota fiscal. Em cumprimento estrito ao Art. 2º, § 10 da IN RFB nº 1.234/2012, a retenção de IRRF (${enq.aliquotaIrrf}%) incide sobre o VALOR ORIGINAL integral da nota (R$ ${enq.baseCalculoIrrf.toFixed(2)}) para cruzamento com a EFD-Reinf/DCTFWeb.`;
+  } else if (enq.descIsencao > 0) {
+    justificativaIrrfFinal = `Retenção de ${enq.aliquotaIrrf}% de IRRF incidente sobre o valor líquido faturado a pagar (R$ ${enq.baseCalculoIrrf.toFixed(2)}), com dedução legítima do ICMS desonerado discriminado na NF-e (Art. 3º-A da IN RFB nº 1.234/2012 e Solução de Consulta Cosit nº 34/2014).`;
+  } else {
+    justificativaIrrfFinal = irrfClass.justificativa;
+  }
+
   return {
     base_calculo_origem: valorTotal,
+    base_calculo_irrf_efetiva: enq.baseCalculoIrrf,
+    is_glosa_administrativa: enq.isGlosaAdministrativa,
+    valor_glosa_icms: enq.valorGlosaIcms > 0 ? enq.valorGlosaIcms : undefined,
     icms_origem_destacado: icmsOrigem,
     valor_desconto_comercial: descontoComercial > 0 ? descontoComercial : undefined,
     desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-    economia_tributaria_total: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-    valor_liquido_com_desconto: enq.descIsencao > 0 ? (valorTotal - enq.descIsencao) : undefined,
+    economia_tributaria_total: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (enq.descIsencao + enq.valorGlosaIcms) : undefined,
+    valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorTotal - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
 
     aplica_irrf_in1234: isOrgaoPublico && !isSimples,
     aliquota_irrf_in1234: (isOrgaoPublico && !isSimples) ? enq.aliquotaIrrf : 0,
     codigo_retencao_irrf: (isOrgaoPublico && !isSimples) ? irrfClass.codigoRfb : 'DISPENSADO',
     categoria_irrf_in1234: isSimples ? 'Simples Nacional - Isento de Retenção (Art. 4º, XI IN 1234)' : irrfClass.categoria,
     valor_irrf_retido: enq.irrf,
-    justificativa_irrf_in1234: isSimples ? "Dispensa de retenção na fonte do IRRF: Fornecedor optante pelo Simples Nacional (Art. 4º, inciso XI da Instrução Normativa RFB nº 1.234/2012)." : irrfClass.justificativa,
+    justificativa_irrf_in1234: justificativaIrrfFinal,
     valor_liquido_pagamento_fornecedor: enq.liquidoItem,
 
     total_recolher_mt: 0
@@ -219,8 +276,16 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
   const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
   const isOrgaoPublico = tipoAdquirente === 'ORGAO_PUBLICO_ESTADUAL';
 
+  const primeiroItem = op.itens && op.itens.length > 0 ? op.itens[0] : null;
+
   const enq = calcularEnquadramentoItem(
-      { ncm: op.ncm, valorTotal, descricao: op.descricao_produto },
+      {
+        ncm: op.ncm,
+        valorTotal,
+        descricao: op.descricao_produto,
+        valor_icms_desonerado: primeiroItem?.valor_icms_desonerado,
+        cst: primeiroItem?.cst
+      },
       { isSimplesNacional: isSimples },
       { tipo: tipoAdquirente }
   );
@@ -237,7 +302,10 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
 
   const aliqMT = "17%";
 
-  let mvaPauta = enq.isST ? "Substituição Tributária (Anexo X MT)" : (enq.cst === '40' ? "Isento c/ Desconto Obrigatório no Preço (Conv. 73/04)" : "Tributação Normal MT");
+  let mvaPauta = enq.isST
+      ? "Substituição Tributária (Anexo X MT)"
+      : (enq.cst === '40' ? "Isento c/ Desconto Obrigatório no Preço (Conv. 73/04)" : "Tributação Normal MT");
+
   if (isSimples) {
     mvaPauta = enq.isST ? "CSOSN 500 (ST Antecipada)" : "CSOSN 102 (Valor Integral da Proposta)";
   }
@@ -250,7 +318,7 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
       fundamentacao.push({
         artigo_anexo: "Orientação Técnica nº 03/2026 - CGE/MT & LC 123/2006",
         dispositivo: "Cartilha de Execução Financeira CGE-MT / RICMS-MT",
-        resumo_regra: "Conforme a OT CGE 03/2026, a isenção de ICMS do Art. 65 Anexo IV NÃO se aplica a fornecedores optantes pelo Simples Nacional. A nota é emitida pelo valor integral da proposta, sem desconto de 17% (CSOSN 102 ou 500)."
+        resumo_regra: "Conforme a OT CGE 03/2026, a isenção de ICMS do Art. 65 Anexo IV NÃO se aplica a fornecedores optantes pelo Simples Nacional. A nota é faturada pelo valor integral da proposta (CSOSN 102 ou 500)."
       });
       fundamentacao.push({
         artigo_anexo: "Art. 4º, XI da IN RFB nº 1.234/2012",
@@ -261,12 +329,23 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
       fundamentacao.push({
         artigo_anexo: "Art. 65, § 3º do Anexo IV do RICMS/MT & OT 03/2026 CGE-MT",
         dispositivo: "Decreto nº 2.212/2014-MT / OT 03/2026",
-        resumo_regra: "Produtos enquadrados em Substituição Tributária (Anexo X) possuem fase tributária encerrada anteriormente (CST 60) e NÃO sofrem desconto de isenção de ICMS nas vendas a Órgãos Públicos."
+        resumo_regra: "Produtos enquadrados em Substituição Tributária (Anexo X) possuem fase tributária encerrada (CST 60) e NÃO sofrem desconto de isenção de ICMS nas vendas a Órgãos Públicos."
       });
       fundamentacao.push({
         artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
         dispositivo: `Instrução Normativa RFB nº 1.234/2012 (Anexo I - Código ${irrfClass.codigoRfb})`,
-        resumo_regra: `Retenção na fonte obrigatória de IRRF no percentual de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) sobre o valor faturado no fornecimento de mercadorias a Órgãos Públicos.`
+        resumo_regra: `Retenção na fonte obrigatória de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) sobre o valor faturado no fornecimento a Órgãos Públicos.`
+      });
+    } else if (enq.isGlosaAdministrativa) {
+      fundamentacao.push({
+        artigo_anexo: "Art. 2º, § 10 da Instrução Normativa RFB nº 1.234/2012",
+        dispositivo: "Regulamento de Retenção de Tributos Federais",
+        resumo_regra: "Havendo pagamento com glosa do ICMS indevidamente faturado sem emissão de nova NF-e substitutiva, a retenção de IRRF DEVE INCIDIR SOBRE O VALOR ORIGINAL DA NOTA para fechamento da EFD-Reinf e DCTFWeb."
+      });
+      fundamentacao.push({
+        artigo_anexo: "Artigo 2º Anexo I & Art. 65 Anexo IV do RICMS/MT",
+        dispositivo: "Decreto Estadual nº 2.212/2014-MT / Convênio ICMS 73/2004",
+        resumo_regra: "A isenção do ICMS é condicionada à demonstração expressa da dedução no documento fiscal. A ausência do desconto formal na nota autoriza a glosa financeira de 17% pelo Órgão Público."
       });
     } else {
       fundamentacao.push({
@@ -275,9 +354,9 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
         resumo_regra: "Isenção do ICMS mandatória para fornecedor do Regime Normal vendendo produto fora da ST para Órgão Público Estadual (CST 40), com desconto do ICMS desonerado (17%) no valor final da nota."
       });
       fundamentacao.push({
-        artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
+        artigo_anexo: "Art. 3º-A da IN RFB 1.234/2012 & SC Cosit nº 34/2014",
         dispositivo: `Instrução Normativa RFB nº 1.234/2012 (Anexo I - Código ${irrfClass.codigoRfb})`,
-        resumo_regra: `Retenção na fonte obrigatória de IRRF no percentual de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) sobre o valor faturado (após abatimento da isenção de ICMS) no fornecimento de bens a Órgãos Públicos.`
+        resumo_regra: `Retenção na fonte de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% incidente sobre o valor líquido faturado a pagar, em razão da dedução regular do ICMS desonerado constante na NF-e.`
       });
     }
   } else {
@@ -302,8 +381,10 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
       orientacao = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (${enq.cst === '500' ? 'CSOSN 500' : 'CSOSN 102'}): A isenção de ICMS NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB 1.234/2012).`;
     } else if (enq.isST) {
       orientacao = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não se aplica a mercadorias sob ST. 2) A NF-e é emitida pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) no pagamento ao fornecedor.`;
+    } else if (enq.isGlosaAdministrativa) {
+      orientacao = `ALERTA DE GLOSA ADMINISTRATIVA (Art. 2º, § 10 da IN RFB nº 1.234/2012): A NF-e foi emitida sem a dedução formal do ICMS isento (CST 00/sem vICMSDeson). 1) O Órgão Público glosará R$ ${enq.valorGlosaIcms.toFixed(2)} (17% de ICMS indevido) no pagamento financeiro. 2) A retenção de IRRF (${enq.aliquotaIrrf}%) DEVE SER CALCULADA SOBRE O VALOR ORIGINAL DA NOTA (R$ ${enq.baseCalculoIrrf.toFixed(2)}), gerando IRRF retido de R$ ${enq.irrf.toFixed(2)}. 3) Ordem Bancária líquida ao fornecedor: R$ ${enq.liquidoItem.toFixed(2)}.`;
     } else {
-      orientacao = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Conv. 73/04): 1) REGIME NORMAL FORA DA ST (CST 40): Isenção de ICMS OBRIGATÓRIA. 2) A NF-e deve destacar o abatimento no campo 'vICMSDesonerado' (17%). 3) Retenção de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) sobre o valor faturado com desconto.`;
+      orientacao = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Conv. 73/04): 1) REGIME NORMAL FORA DA ST (CST 40): Isenção de ICMS OBRIGATÓRIA (17%). 2) Desconto discriminado no campo 'vICMSDesonerado'. 3) Retenção de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% sobre o valor faturado com desconto (Art. 3º-A da IN 1.234/12).`;
     }
   } else {
     orientacao = `Operação comercial enquadrada no regime de ${enq.regimeMt}.`;
@@ -334,17 +415,20 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
 
   const simulacaoCalculo: SimulacaoMemoriaCalculo = {
     base_calculo_origem: valorTotal,
+    base_calculo_irrf_efetiva: enq.baseCalculoIrrf,
+    is_glosa_administrativa: enq.isGlosaAdministrativa,
+    valor_glosa_icms: enq.valorGlosaIcms > 0 ? enq.valorGlosaIcms : undefined,
     icms_origem_destacado: isSimples ? 0 : (op.icms_proprio_destacado || 0),
     valor_desconto_comercial: descontoComercial > 0 ? descontoComercial : undefined,
     desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-    economia_tributaria_total: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-    valor_liquido_com_desconto: enq.descIsencao > 0 ? (valorTotal - enq.descIsencao) : undefined,
+    economia_tributaria_total: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (enq.descIsencao + enq.valorGlosaIcms) : undefined,
+    valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorTotal - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
     aplica_irrf_in1234: isOrgaoPublico && !isSimples,
     aliquota_irrf_in1234: (isOrgaoPublico && !isSimples) ? enq.aliquotaIrrf : 0,
     codigo_retencao_irrf: (isOrgaoPublico && !isSimples) ? irrfClass.codigoRfb : 'DISPENSADO',
     categoria_irrf_in1234: isSimples ? 'Simples Nacional - Isento de Retenção (Art. 4º, XI IN 1234)' : irrfClass.categoria,
     valor_irrf_retido: enq.irrf,
-    justificativa_irrf_in1234: isSimples ? 'Dispensa de retenção na fonte do IRRF: Fornecedor optante pelo Simples Nacional (Art. 4º, inciso XI da IN RFB nº 1.234/2012).' : irrfClass.justificativa,
+    justificativa_irrf_in1234: isSimples ? 'Dispensa de retenção na fonte do IRRF: Fornecedor optante pelo Simples Nacional (Art. 4º, inciso XI da IN RFB nº 1.234/2012).' : orientacao,
     valor_liquido_pagamento_fornecedor: enq.liquidoItem,
     total_recolher_mt: 0
   };
@@ -364,6 +448,8 @@ export function computeConsolidatedSimulation(
   let totalFreteDespesas = 0;
   let totalBaseCalculo = 0;
   let totalDescontoIsencaoIcms = 0;
+  let totalGlosaIcms = 0;
+  let totalBaseIrrf = 0;
   let totalEconomiaReducaoBc = 0;
   let totalEconomiaTributaria = 0;
   let totalIrrfRetido = 0;
@@ -381,8 +467,10 @@ export function computeConsolidatedSimulation(
     totalFreteDespesas += vFreteDespItem;
     totalBaseCalculo += simulacao.base_calculo_origem || (Math.max(0, vBrutoItem - vDescItem) + vFreteDespItem);
     totalDescontoIsencaoIcms += simulacao.desconto_isencao_orgao_publico || 0;
+    totalGlosaIcms += simulacao.valor_glosa_icms || 0;
+    totalBaseIrrf += simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem;
     totalEconomiaReducaoBc += simulacao.desconto_reducao_bc_anexo_v || 0;
-    totalEconomiaTributaria += (simulacao.desconto_isencao_orgao_publico || 0) + (simulacao.desconto_reducao_bc_anexo_v || 0);
+    totalEconomiaTributaria += (simulacao.desconto_isencao_orgao_publico || 0) + (simulacao.valor_glosa_icms || 0) + (simulacao.desconto_reducao_bc_anexo_v || 0);
     totalIrrfRetido += simulacao.valor_irrf_retido || 0;
     totalLiquidoPagar += (simulacao.valor_liquido_pagamento_fornecedor !== undefined
         ? simulacao.valor_liquido_pagamento_fornecedor
@@ -398,6 +486,8 @@ export function computeConsolidatedSimulation(
     total_frete_despesas: totalFreteDespesas,
     total_base_calculo: totalBaseCalculo,
     total_desconto_isencao_icms: totalDescontoIsencaoIcms,
+    total_glosa_icms: totalGlosaIcms,
+    total_base_irrf: totalBaseIrrf,
     total_economia_reducao_bc: totalEconomiaReducaoBc,
     total_economia_tributaria: totalEconomiaTributaria,
     total_irrf_retido: totalIrrfRetido,
@@ -431,12 +521,16 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
     const descontoItem = Number(it.valor_desconto_comercial) || 0;
     const freteDespesasItem = (Number(it.valor_frete) || 0) + (Number(it.valor_despesas) || 0);
 
-    // Base líquida da mercadoria após o desconto comercial:
     const valorLiquidoBaseItem = Math.max(0, valorBrutoItem - descontoItem) + freteDespesasItem;
 
-    // Aplicação da Árvore de Decisão Determinística por Item
     const enq = calcularEnquadramentoItem(
-        { ncm: it.ncm, valorTotal: valorLiquidoBaseItem, descricao: it.descricao },
+        {
+          ncm: it.ncm,
+          valorTotal: valorLiquidoBaseItem,
+          descricao: it.descricao,
+          valor_icms_desonerado: it.valor_icms_desonerado,
+          cst: it.cst
+        },
         { isSimplesNacional: isSimples },
         { tipo: tipoAdquirente }
     );
@@ -458,9 +552,12 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
     const simulacaoAtualizada: SimulacaoMemoriaCalculo = {
       ...det.simulacaoCalculo,
       base_calculo_origem: valorLiquidoBaseItem,
+      base_calculo_irrf_efetiva: enq.baseCalculoIrrf,
+      is_glosa_administrativa: enq.isGlosaAdministrativa,
+      valor_glosa_icms: enq.valorGlosaIcms > 0 ? enq.valorGlosaIcms : undefined,
       valor_desconto_comercial: descontoItem > 0 ? descontoItem : undefined,
       desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-      valor_liquido_com_desconto: enq.descIsencao > 0 ? (valorLiquidoBaseItem - enq.descIsencao) : undefined,
+      valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
       valor_irrf_retido: enq.irrf,
       aliquota_irrf_in1234: enq.aliquotaIrrf,
       valor_liquido_pagamento_fornecedor: enq.liquidoItem
@@ -489,17 +586,21 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
   const primeiro = itensAnalise[0];
 
   const temMultiplosItens = itensAnalise.length > 1;
+  const temAlgumaGlosa = itensAnalise.some(i => i.simulacao.is_glosa_administrativa);
+
   let orientacaoConsolidada = "";
 
   if (isSimples) {
     orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 102/500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`;
   } else if (temMultiplosItens) {
-    orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) Operação com ${itensAnalise.length} itens. Os itens sujeitos à Substituição Tributária (CST 60) são faturados pelo valor integral e os itens fora da ST (CST 40) exigem abatimento de 17% de ICMS desonerado. 2) Retenção na fonte de IRRF apurada ITEM A ITEM conforme enquadramento do Anexo I da IN RFB nº 1.234/2012 (incluindo 0,24% para combustíveis/GLP e 1,20% para mercadorias em geral), totalizando a retenção de ${resumo.total_irrf_retido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no pagamento ao fornecedor.`;
+    orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) Operação com ${itensAnalise.length} itens.${temAlgumaGlosa ? ` Identificada GLOSA ADMINISTRATIVA em itens sem desoneração formal (Art. 2º, § 10 da IN 1.234/12), onde a retenção de IRRF incide sobre o valor original.` : ''} 2) Retenção na fonte de IRRF apurada ITEM A ITEM conforme Anexo I da IN RFB nº 1.234/2012 (incluindo 0,24% para combustíveis/GLP e 1,20% para mercadorias), totalizando a retenção de ${resumo.total_irrf_retido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no pagamento ao fornecedor.`;
   } else {
     const aliqUnica = itensAnalise[0]?.simulacao.aliquota_irrf_in1234 || 1.20;
     const isStUnico = itensAnalise[0]?.jsonResponse.enquadramento_produto.regime_tributario_aplicavel?.includes('Substituição');
     if (isStUnico) {
       orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não se aplica a mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de ${aliqUnica.toFixed(2)}% no pagamento ao fornecedor.`;
+    } else if (primeiro.simulacao.is_glosa_administrativa) {
+      orientacaoConsolidada = `ALERTA DE GLOSA ADMINISTRATIVA (Art. 2º, § 10 da IN RFB 1.234/2012): A NF-e não trouxe o ICMS desonerado formal. Glosa financeira de R$ ${resumo.total_glosa_icms.toFixed(2)} aplicada no pagamento. A retenção de IRRF (${aliqUnica}%) incide obrigatoriamente sobre o valor original da nota.`;
     } else {
       orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Conv. 73/04): 1) REGIME NORMAL FORA DA ST (CST 40): Isenção de ICMS OBRIGATÓRIA (17%). 2) Retenção de IRRF de ${aliqUnica.toFixed(2)}% sobre o valor faturado com desconto.`;
     }
@@ -510,14 +611,14 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
         {
           artigo_anexo: "Orientação Técnica nº 03/2026 CGE-MT & RICMS/MT",
           dispositivo: "Decreto nº 2.212/2014-MT",
-          resumo_regra: `Operação com ${itensAnalise.length} itens: produtos enquadrados no Anexo X (ST) são faturados integralmente (CST 60) e itens fora da ST exigem abatimento obrigatório de 17% a título de ICMS desonerado (CST 40).`
+          resumo_regra: `Operação com ${itensAnalise.length} itens: produtos enquadrados no Anexo X (ST) são faturados integralmente (CST 60) e itens fora da ST exigem abatimento de 17% a título de ICMS desonerado (CST 40) ou glosa administrativa.`
         },
         {
           artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
-          dispositivo: "Instrução Normativa RFB nº 1.234/2012 (Anexo I)",
+          dispositivo: "Instrução Normativa RFB nº 1.234/2012 (Art. 2º, § 10 c/c Art. 3º-A)",
           resumo_regra: isSimples
               ? "Dispensa de retenção na fonte do IRRF para fornecedor optante pelo Simples Nacional (Art. 4º, XI)."
-              : "Retenção na fonte de IRRF apurada item a item conforme alíquotas do Anexo I (0,24% para derivados de petróleo/GLP e 1,20% para bens em geral)."
+              : "Retenção na fonte de IRRF item a item: base líquida para descontos formais (Art. 3º-A) ou base integral para pagamentos com glosa sem nova NF (Art. 2º, § 10)."
         }
       ]
       : primeiro.jsonResponse.fundamentacao_legal;
@@ -537,12 +638,15 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
     simulacaoCalculo: {
       ...primeiro.simulacao,
       base_calculo_origem: resumo.total_base_calculo,
+      base_calculo_irrf_efetiva: resumo.total_base_irrf,
+      is_glosa_administrativa: temAlgumaGlosa,
+      valor_glosa_icms: resumo.total_glosa_icms > 0 ? resumo.total_glosa_icms : undefined,
       icms_origem_destacado: resumo.total_icms_origem_destacado,
       valor_desconto_comercial: resumo.total_desconto_comercial > 0 ? resumo.total_desconto_comercial : undefined,
       desconto_isencao_orgao_publico: resumo.total_desconto_isencao_icms > 0 ? resumo.total_desconto_isencao_icms : undefined,
       desconto_reducao_bc_anexo_v: resumo.total_economia_reducao_bc > 0 ? resumo.total_economia_reducao_bc : undefined,
       economia_tributaria_total: resumo.total_economia_tributaria > 0 ? resumo.total_economia_tributaria : undefined,
-      valor_liquido_com_desconto: resumo.total_base_calculo - resumo.total_desconto_isencao_icms,
+      valor_liquido_com_desconto: resumo.total_base_calculo - (resumo.total_desconto_isencao_icms + resumo.total_glosa_icms),
       valor_irrf_retido: resumo.total_irrf_retido > 0 ? resumo.total_irrf_retido : 0,
       valor_liquido_pagamento_fornecedor: resumo.total_liquido_pagar_fornecedor,
       total_recolher_mt: resumo.total_icms_recolher_mt
@@ -642,7 +746,6 @@ export function getCstInfo(
     };
   }
 
-  // Regime Normal (CST ICMS 2 dígitos)
   if (isSt) {
     return {
       codigo: '60',

@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
+import { exec } from 'child_process';
 import { fetchCnpjData } from './src/server/cnpjService.js';
 import { processTaxAnalysis, getTaxCacheStats } from './src/server/taxEngine.js';
 import { calcularEnquadramentoItem, computeConsolidatedSimulation } from './src/lib/taxCalculations.js';
@@ -8,7 +8,7 @@ import { OperacaoComercial } from './src/types.js';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json({ limit: '1mb' }));
 
@@ -69,7 +69,13 @@ async function startServer() {
           const valorLiquidoBaseItem = Math.max(0, valorBrutoItem - descontoComercialItem) + freteDespesasItem;
 
           const enq = calcularEnquadramentoItem(
-              { ncm: item.ncm, valorTotal: valorLiquidoBaseItem, descricao: item.descricao },
+              {
+                ncm: item.ncm,
+                valorTotal: valorLiquidoBaseItem,
+                descricao: item.descricao,
+                valor_icms_desonerado: item.valor_icms_desonerado,
+                cst: item.cst
+              },
               { isSimplesNacional: isSimples },
               { tipo: tipoAdquirente }
           );
@@ -101,9 +107,12 @@ async function startServer() {
           const simulacaoAtualizada = {
             ...singleResult.simulacaoCalculo,
             base_calculo_origem: valorLiquidoBaseItem,
+            base_calculo_irrf_efetiva: enq.baseCalculoIrrf,
+            is_glosa_administrativa: enq.isGlosaAdministrativa,
+            valor_glosa_icms: enq.valorGlosaIcms > 0 ? enq.valorGlosaIcms : undefined,
             valor_desconto_comercial: descontoComercialItem > 0 ? descontoComercialItem : undefined,
             desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-            valor_liquido_com_desconto: enq.descIsencao > 0 ? (valorLiquidoBaseItem - enq.descIsencao) : undefined,
+            valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
             valor_irrf_retido: enq.irrf,
             aliquota_irrf_in1234: enq.aliquotaIrrf,
             valor_liquido_pagamento_fornecedor: enq.liquidoItem,
@@ -114,7 +123,9 @@ async function startServer() {
             item: {
               ...item,
               valor_total: valorBrutoItem,
-              valor_desconto_comercial: descontoComercialItem
+              valor_desconto_comercial: descontoComercialItem,
+              cst: item.cst,
+              valor_icms_desonerado: item.valor_icms_desonerado
             },
             jsonResponse: jsonAtualizado,
             simulacao: simulacaoAtualizada
@@ -123,18 +134,22 @@ async function startServer() {
 
         const resumoConsolidado = computeConsolidatedSimulation(itensAnalise);
         const primeiro = itensAnalise[0];
+        const temAlgumaGlosa = itensAnalise.some(i => i.simulacao.is_glosa_administrativa);
 
         return res.json({
           jsonResponse: primeiro.jsonResponse,
           simulacaoCalculo: {
             ...primeiro.simulacao,
             base_calculo_origem: resumoConsolidado.total_base_calculo,
+            base_calculo_irrf_efetiva: resumoConsolidado.total_base_irrf,
+            is_glosa_administrativa: temAlgumaGlosa,
+            valor_glosa_icms: resumoConsolidado.total_glosa_icms > 0 ? resumoConsolidado.total_glosa_icms : undefined,
             icms_origem_destacado: resumoConsolidado.total_icms_origem_destacado,
             valor_desconto_comercial: resumoConsolidado.total_desconto_comercial > 0 ? resumoConsolidado.total_desconto_comercial : undefined,
             desconto_isencao_orgao_publico: resumoConsolidado.total_desconto_isencao_icms > 0 ? resumoConsolidado.total_desconto_isencao_icms : undefined,
             desconto_reducao_bc_anexo_v: resumoConsolidado.total_economia_reducao_bc > 0 ? resumoConsolidado.total_economia_reducao_bc : undefined,
             economia_tributaria_total: resumoConsolidado.total_economia_tributaria > 0 ? resumoConsolidado.total_economia_tributaria : undefined,
-            valor_liquido_com_desconto: resumoConsolidado.total_base_calculo - resumoConsolidado.total_desconto_isencao_icms,
+            valor_liquido_com_desconto: resumoConsolidado.total_base_calculo - (resumoConsolidado.total_desconto_isencao_icms + resumoConsolidado.total_glosa_icms),
             valor_irrf_retido: resumoConsolidado.total_irrf_retido > 0 ? resumoConsolidado.total_irrf_retido : 0,
             valor_liquido_pagamento_fornecedor: resumoConsolidado.total_liquido_pagar_fornecedor,
             total_recolher_mt: resumoConsolidado.total_icms_recolher_mt
@@ -259,23 +274,26 @@ async function startServer() {
     res.status(500).json({ error: err?.message || 'Erro interno no servidor.' });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
+  // Em produção (ou executável empacotado), serve os estáticos de dist/
+  if (process.env.NODE_ENV === 'production' || (process as any).pkg) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  } else {
+    // Import dinâmico do Vite apenas quando rodando em desenvolvimento local
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Motor de Análise Tributária rodando na porta ${PORT}`);
+    const url = `http://localhost:${PORT}`;
+    console.log(`Motor de Análise Tributária rodando em: ${url}`);
   });
 }
 

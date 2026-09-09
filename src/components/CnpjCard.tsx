@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Building2, CheckCircle2, AlertTriangle, RefreshCw, Server, MapPin, Tag } from 'lucide-react';
 import { CnpjApiResult, AppTheme } from '../types.js';
 
@@ -12,6 +12,21 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
   const [cnpjInput, setCnpjInput] = useState('60.701.190/0001-04');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const formatCnpj = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 14);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+    if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+    if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  };
+
+  useEffect(() => {
+    if (currentSupplier?.cnpj) {
+      setCnpjInput(formatCnpj(currentSupplier.cnpj));
+    }
+  }, [currentSupplier?.cnpj]);
 
   const getThemeStyles = () => {
     switch (currentTheme) {
@@ -52,15 +67,6 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
   };
 
   const themeStyle = getThemeStyles();
-
-  const formatCnpj = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 14);
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
-    if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
-    if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
-    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCnpjInput(formatCnpj(e.target.value));
@@ -106,121 +112,121 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-5 transition-all space-y-4">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div className="flex items-center space-x-2.5">
-          <div className={`p-2 rounded ${themeStyle.iconBox}`}>
-            <Building2 className="w-5 h-5" />
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-5 transition-all space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center space-x-2.5">
+            <div className={`p-2 rounded ${themeStyle.iconBox}`}>
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">1. Dados Cadastrais do Fornecedor</h2>
+              <p className="text-xs text-slate-500">
+                Consulta em tempo real via dados abertos da Receita Federal (Fallback automático)
+              </p>
+            </div>
           </div>
+        </div>
+
+        <div className="space-y-3.5">
           <div>
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">1. Dados Cadastrais do Fornecedor</h2>
-            <p className="text-xs text-slate-500">
-              Consulta em tempo real via dados abertos da Receita Federal (Fallback automático)
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3.5">
-        <div>
-          <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">
-            CNPJ do Fornecedor / Remetente
-          </label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={cnpjInput}
-                onChange={handleInputChange}
-                placeholder="00.000.000/0000-00"
-                className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 transition ${themeStyle.focusRing}`}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => handleSearch()}
-              disabled={loading}
-              className={`px-4 py-2.5 font-bold text-xs rounded flex items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer flex-shrink-0 ${themeStyle.btnSearch}`}
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Consultando...</span>
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4" />
-                  <span>Consultar CNPJ</span>
-                </>
-              )}
-            </button>
-          </div>
-          {error && (
-            <div className="mt-2 text-xs text-rose-800 flex items-center gap-1.5 bg-rose-50 border border-rose-200 p-2.5 rounded">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600" />
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
-
-        {currentSupplier && (
-          <div className="bg-slate-50 border border-slate-200/90 rounded-lg p-4 text-xs space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
-              <div>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Razão Social</span>
-                <span className="font-bold text-slate-900 text-sm">{currentSupplier.razao_social}</span>
-                {currentSupplier.nome_fantasia && (
-                  <span className="text-slate-600 block text-xs">({currentSupplier.nome_fantasia})</span>
+            <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">
+              CNPJ do Fornecedor / Remetente
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                    type="text"
+                    value={cnpjInput}
+                    onChange={handleInputChange}
+                    placeholder="00.000.000/0000-00"
+                    className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 transition ${themeStyle.focusRing}`}
+                />
+              </div>
+              <button
+                  type="button"
+                  onClick={() => handleSearch()}
+                  disabled={loading}
+                  className={`px-4 py-2.5 font-bold text-xs rounded flex items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer flex-shrink-0 ${themeStyle.btnSearch}`}
+              >
+                {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Consultando...</span>
+                    </>
+                ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      <span>Consultar CNPJ</span>
+                    </>
                 )}
-              </div>
-              <div className="flex items-center gap-1.5 bg-white border border-slate-200 text-teal-800 px-2.5 py-1 rounded text-[11px] font-mono shadow-2xs">
-                <Server className="w-3 h-3 text-teal-600" />
-                <span>API: {currentSupplier.fonte_api}</span>
-              </div>
+              </button>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Porte Fiscal</span>
-                <span className="font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded inline-block mt-0.5 shadow-2xs">
-                  {currentSupplier.porte}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Simples Nacional</span>
-                <span
-                  className={`font-semibold px-2 py-0.5 rounded inline-flex items-center gap-1 mt-0.5 ${
-                    currentSupplier.optante_simples
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                      : 'bg-teal-100 text-teal-900 border border-teal-300'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  {currentSupplier.optante_simples ? 'Sim (Optante LC 123/06)' : 'Não (Regime Normal / DEMAIS)'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Origem</span>
-                <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3.5 h-3.5 text-teal-600" />
-                  {currentSupplier.uf} - {currentSupplier.municipio || 'São Paulo'}
-                </span>
-              </div>
-            </div>
-
-            {currentSupplier.cnae_principal_descricao && (
-              <div className="pt-2 text-slate-600 border-t border-slate-200 flex items-start gap-1.5 font-sans">
-                <Tag className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
-                <span>
-                  <strong className="text-slate-800">CNAE Principal:</strong> {currentSupplier.cnae_principal_codigo} - {currentSupplier.cnae_principal_descricao}
-                </span>
-              </div>
+            {error && (
+                <div className="mt-2 text-xs text-rose-800 flex items-center gap-1.5 bg-rose-50 border border-rose-200 p-2.5 rounded">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600" />
+                  <span>{error}</span>
+                </div>
             )}
           </div>
-        )}
+
+          {currentSupplier && (
+              <div className="bg-slate-50 border border-slate-200/90 rounded-lg p-4 text-xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Razão Social</span>
+                    <span className="font-bold text-slate-900 text-sm">{currentSupplier.razao_social}</span>
+                    {currentSupplier.nome_fantasia && (
+                        <span className="text-slate-600 block text-xs">({currentSupplier.nome_fantasia})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white border border-slate-200 text-teal-800 px-2.5 py-1 rounded text-[11px] font-mono shadow-2xs">
+                    <Server className="w-3 h-3 text-teal-600" />
+                    <span>API: {currentSupplier.fonte_api}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Porte Fiscal</span>
+                    <span className="font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded inline-block mt-0.5 shadow-2xs">
+                  {currentSupplier.porte}
+                </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Simples Nacional</span>
+                    <span
+                        className={`font-semibold px-2 py-0.5 rounded inline-flex items-center gap-1 mt-0.5 ${
+                            currentSupplier.optante_simples
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : 'bg-teal-100 text-teal-900 border border-teal-300'
+                        }`}
+                    >
+                  <CheckCircle2 className="w-3 h-3" />
+                      {currentSupplier.optante_simples ? 'Sim (Optante LC 123/06)' : 'Não (Regime Normal / DEMAIS)'}
+                </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Origem</span>
+                    <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-teal-600" />
+                      {currentSupplier.uf} - {currentSupplier.municipio || 'São Paulo'}
+                </span>
+                  </div>
+                </div>
+
+                {currentSupplier.cnae_principal_descricao && (
+                    <div className="pt-2 text-slate-600 border-t border-slate-200 flex items-start gap-1.5 font-sans">
+                      <Tag className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
+                      <span>
+                  <strong className="text-slate-800">CNAE Principal:</strong> {currentSupplier.cnae_principal_codigo} - {currentSupplier.cnae_principal_descricao}
+                </span>
+                    </div>
+                )}
+              </div>
+          )}
+        </div>
       </div>
-    </div>
   );
 };
