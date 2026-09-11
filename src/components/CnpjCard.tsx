@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building2, CheckCircle2, AlertTriangle, RefreshCw, Server, MapPin, Tag } from 'lucide-react';
+import { Search, Building2, CheckCircle2, AlertTriangle, RefreshCw, Server, MapPin, Tag, SlidersHorizontal } from 'lucide-react';
 import { CnpjApiResult, AppTheme } from '../types.js';
 
 interface CnpjCardProps {
@@ -8,10 +8,13 @@ interface CnpjCardProps {
   currentTheme?: AppTheme;
 }
 
+export type CnpjApiProvider = 'AUTO' | 'BRASIL_API' | 'OPEN_CNPJ' | 'RECEITA_WS';
+
 export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSupplier, currentTheme = 'GOV_CLASSIC' }) => {
   const [cnpjInput, setCnpjInput] = useState('60.701.190/0001-04');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<CnpjApiProvider>('AUTO');
 
   const formatCnpj = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -34,34 +37,26 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
         return {
           iconBox: 'bg-emerald-50 border border-emerald-200 text-emerald-800',
           btnSearch: 'bg-emerald-700 hover:bg-emerald-800 text-amber-100 border border-emerald-600',
-          focusRing: 'focus:ring-emerald-600/20 focus:border-emerald-600',
-          badgeApi: 'text-emerald-800 bg-emerald-50 border-emerald-200',
-          tagNormal: 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+          focusRing: 'focus:ring-emerald-600/20 focus:border-emerald-600'
         };
       case 'FINTECH_PRO':
         return {
           iconBox: 'bg-indigo-50 border border-indigo-200 text-indigo-700',
           btnSearch: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20',
-          focusRing: 'focus:ring-indigo-600/20 focus:border-indigo-600',
-          badgeApi: 'text-indigo-800 bg-indigo-50 border-indigo-200',
-          tagNormal: 'bg-indigo-100 text-indigo-950 border border-indigo-300'
+          focusRing: 'focus:ring-indigo-600/20 focus:border-indigo-600'
         };
       case 'DARK_AUDITOR':
         return {
           iconBox: 'bg-cyan-950 border border-cyan-800 text-cyan-400',
           btnSearch: 'bg-cyan-600 hover:bg-cyan-500 text-black font-bold border border-cyan-400',
-          focusRing: 'focus:ring-cyan-500/20 focus:border-cyan-500',
-          badgeApi: 'text-cyan-300 bg-slate-900 border-cyan-800',
-          tagNormal: 'bg-cyan-950 text-cyan-200 border border-cyan-700'
+          focusRing: 'focus:ring-cyan-500/20 focus:border-cyan-500'
         };
       case 'INSTITUCIONAL':
       default:
         return {
           iconBox: 'bg-teal-50 border border-teal-200 text-teal-700',
           btnSearch: 'bg-teal-700 hover:bg-teal-800 text-white',
-          focusRing: 'focus:ring-teal-600/20 focus:border-teal-600',
-          badgeApi: 'text-teal-800 bg-white border-slate-200',
-          tagNormal: 'bg-teal-100 text-teal-900 border border-teal-300'
+          focusRing: 'focus:ring-teal-600/20 focus:border-teal-600'
         };
     }
   };
@@ -86,7 +81,8 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
     setError(null);
 
     try {
-      const res = await fetch(`/api/cnpj/${cleanDigits}`);
+      // Passa o provedor desejado via Query Parameter para o backend Node
+      const res = await fetch(`/api/cnpj/${cleanDigits}?provider=${selectedProvider}`);
       const contentType = res.headers.get('content-type') || '';
 
       if (!res.ok) {
@@ -105,7 +101,7 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
       const data: CnpjApiResult = await res.json();
       onSupplierLoaded(data);
     } catch (err: any) {
-      setError(err.message || 'Erro de conexão com API do CNPJ.');
+      setError(err.message || 'Erro de conexão com o servidor.');
     } finally {
       setLoading(false);
     }
@@ -113,7 +109,7 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
 
   return (
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-5 transition-all space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
           <div className="flex items-center space-x-2.5">
             <div className={`p-2 rounded ${themeStyle.iconBox}`}>
               <Building2 className="w-5 h-5" />
@@ -121,9 +117,23 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">1. Dados Cadastrais do Fornecedor</h2>
               <p className="text-xs text-slate-500">
-                Consulta em tempo real via dados abertos da Receita Federal (Fallback automático)
+                Consulta em tempo real via dados abertos da Receita Federal
               </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 text-[11px]">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 ml-1" />
+            <select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value as CnpjApiProvider)}
+                className="bg-transparent text-slate-700 font-semibold focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="AUTO">Automático (Fallback)</option>
+              <option value="BRASIL_API">BrasilAPI</option>
+              <option value="OPEN_CNPJ">OpenCNPJ</option>
+              <option value="RECEITA_WS">ReceitaWS</option>
+            </select>
           </div>
         </div>
 
@@ -187,10 +197,12 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Porte Fiscal</span>
-                    <span className="font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded inline-block mt-0.5 shadow-2xs">
-                  {currentSupplier.porte}
-                </span>
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">
+                      Porte Fiscal
+                    </span>
+                                      <span className="font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded inline-block mt-0.5 shadow-2xs">
+                      {currentSupplier.optante_simei ? 'MEI (SIMEI)' : currentSupplier.porte}
+                    </span>
                   </div>
 
                   <div>
@@ -211,7 +223,7 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
                     <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Origem</span>
                     <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
                   <MapPin className="w-3.5 h-3.5 text-teal-600" />
-                      {currentSupplier.uf} - {currentSupplier.municipio || 'São Paulo'}
+                      {currentSupplier.uf} - {currentSupplier.municipio || 'Cuiabá'}
                 </span>
                   </div>
                 </div>
