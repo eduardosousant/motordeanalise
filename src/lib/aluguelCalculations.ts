@@ -1,3 +1,5 @@
+import { truncar, multiplicarETruncar } from './taxCalculations.js';
+
 export interface ResultadoCalculoAluguelPF {
     tipoPessoa: 'PF';
     valorBruto: number;
@@ -72,16 +74,19 @@ export function identificarDocumento(doc: string): { tipo: 'CPF' | 'CNPJ' | 'INV
 }
 
 export function calcularAluguelPF2026(
-    valorBruto: number,
-    inssRetido: number = 0,
+    valorBrutoInput: number,
+    inssRetidoInput: number = 0,
     numDependentes: number = 0,
     usarSimplificado: boolean = true,
     dispensarMinimo: boolean = true
 ): ResultadoCalculoAluguelPF {
+    const valorBruto = truncar(Number(valorBrutoInput) || 0, 2);
+    const inssRetido = truncar(Number(inssRetidoInput) || 0, 2);
+
     const deducaoPorDep = 189.59;
     const descontoSimplificadoPadrao = 607.20;
 
-    const deducoesLegais = inssRetido + (numDependentes * deducaoPorDep);
+    const deducoesLegais = truncar(inssRetido + (numDependentes * deducaoPorDep), 2);
     let deducaoAplicada = deducoesLegais;
     let tipoDeducao = `Deduções Legais (INSS R$ ${inssRetido.toFixed(2)} + ${numDependentes} dep.)`;
 
@@ -90,7 +95,7 @@ export function calcularAluguelPF2026(
         tipoDeducao = 'Desconto Simplificado (R$ 607,20)';
     }
 
-    const baseCalculo = Math.max(0, valorBruto - deducaoAplicada);
+    const baseCalculo = truncar(Math.max(0, valorBruto - deducaoAplicada), 2);
 
     let aliquota = 0;
     let parcelaDeduzir = 0;
@@ -112,7 +117,8 @@ export function calcularAluguelPF2026(
         parcelaDeduzir = 908.73;
     }
 
-    let impostoTabela = Math.max(0, (baseCalculo * (aliquota / 100)) - parcelaDeduzir);
+    const impostoBrutoCalculado = multiplicarETruncar(baseCalculo, aliquota / 100, 2);
+    const impostoTabela = truncar(Math.max(0, impostoBrutoCalculado - parcelaDeduzir), 2);
 
     const fatorReducao = 0.133145;
     let descontoAdicional = 0;
@@ -122,20 +128,21 @@ export function calcularAluguelPF2026(
         descontoAdicional = impostoTabela;
         detalheReducao = 'Redução integral (Isenção efetiva até R$ 5.000,00)';
     } else if (valorBruto <= 7350.00) {
-        descontoAdicional = Math.max(0, 978.62 - (fatorReducao * valorBruto));
+        const parcelaReducao = truncar(fatorReducao * valorBruto, 2);
+        descontoAdicional = truncar(Math.max(0, 978.62 - parcelaReducao), 2);
         detalheReducao = `Redução parcial aplicada: -R$ ${descontoAdicional.toFixed(2)}`;
     }
 
-    let irrfFinal = Math.max(0, impostoTabela - descontoAdicional);
+    let irrfFinal = truncar(Math.max(0, impostoTabela - descontoAdicional), 2);
     let dispensaAplicada = false;
 
     if (dispensarMinimo && irrfFinal <= 10.00) {
         dispensaAplicada = true;
-        irrfFinal = 0;
+        irrfFinal = 0.00;
     }
 
-    const valorLiquido = valorBruto - inssRetido - irrfFinal;
-    const aliquotaEfetiva = valorBruto > 0 ? (irrfFinal / valorBruto) * 100 : 0;
+    const valorLiquido = truncar(valorBruto - inssRetido - irrfFinal, 2);
+    const aliquotaEfetiva = valorBruto > 0 ? truncar((irrfFinal / valorBruto) * 100, 2) : 0;
 
     return {
         tipoPessoa: 'PF',
@@ -155,10 +162,11 @@ export function calcularAluguelPF2026(
 }
 
 export function calcularAluguelPJ(
-    valorBruto: number,
+    valorBrutoInput: number,
     optanteSimples: boolean,
     dispensarMinimo: boolean = true
 ): ResultadoCalculoAluguelPJ {
+    const valorBruto = truncar(Number(valorBrutoInput) || 0, 2);
     const codReceita = '6190';
     const aliquotaIr = 4.80; // Anexo I IN RFB 1.234/2012 - Locação de Imóveis
 
@@ -170,19 +178,21 @@ export function calcularAluguelPJ(
             dispensadoSimples: true,
             codReceita,
             aliquotaIr: 0,
-            irrfRetido: 0,
+            irrfRetido: 0.00,
             valorLiquido: valorBruto,
             dispensaMinimo: false
         };
     }
 
-    let irrf = valorBruto * (aliquotaIr / 100);
+    let irrf = multiplicarETruncar(valorBruto, aliquotaIr / 100, 2);
     let dispensaAplicada = false;
 
     if (dispensarMinimo && irrf <= 10.00) {
         dispensaAplicada = true;
-        irrf = 0;
+        irrf = 0.00;
     }
+
+    const valorLiquido = truncar(valorBruto - irrf, 2);
 
     return {
         tipoPessoa: 'PJ',
@@ -192,7 +202,7 @@ export function calcularAluguelPJ(
         codReceita,
         aliquotaIr,
         irrfRetido: irrf,
-        valorLiquido: valorBruto - irrf,
+        valorLiquido,
         dispensaMinimo: dispensaAplicada
     };
 }

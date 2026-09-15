@@ -9,6 +9,23 @@ import {
 } from '../types.js';
 import { verificarNcmNoAnexoX, consultarNcmOficialMT } from '../data/ncmDatabase.js';
 
+/**
+ * Função utilitária equivalente ao TRUNCAR(valor; 2) do Excel.
+ * Corta as casas decimais a partir da 2ª casa sem realizar arredondamento.
+ */
+export function truncar(valor: number, casas: number = 2): number {
+  if (isNaN(valor) || !isFinite(valor)) return 0;
+  const fator = Math.pow(10, casas);
+  return Math.trunc(valor * fator) / fator;
+}
+
+/**
+ * Multiplica dois números e trunca o resultado em 2 casas decimais (estilo Excel TRUNCAR).
+ */
+export function multiplicarETruncar(num1: number, num2: number, casas: number = 2): number {
+  return truncar(num1 * num2, casas);
+}
+
 export function checkProductSt(ncmInput: string, _descricaoInput?: string): boolean {
   return verificarNcmNoAnexoX(ncmInput);
 }
@@ -40,7 +57,7 @@ export function calcularEnquadramentoItem(
 } {
   const dadosNcm = consultarNcmOficialMT(item.ncm, item.descricao);
   const isST = dadosNcm.isSt;
-  const valorTotal = Number(item.valorTotal) || 0;
+  const valorTotal = truncar(Number(item.valorTotal) || 0, 2);
 
   let cst = '00';
   let regimeMt = 'Tributação Normal';
@@ -75,29 +92,28 @@ export function calcularEnquadramentoItem(
   else if (isOrgaoPublicoMT) {
     if (!isST) {
       regimeMt = 'Isento (Órgão Público MT)';
-      const valorIcmsIsentoCalculado = valorTotal * 0.17;
+      // Trunca o ICMS Isento em 2 casas decimais (17%)
+      const valorIcmsIsentoCalculado = multiplicarETruncar(valorTotal, 0.17, 2);
 
       const cstInformado = item.cst;
       const temDesoneracaoFormalXml = (Number(item.valor_icms_desonerado) || 0) > 0 || cstInformado === '40';
 
-      // O CST SUGERIDO pelo parecer técnico é SEMPRE 40 (Isenção Art. 2º Anexo I / Conv. 73/04)
       cst = '40';
 
       if (temDesoneracaoFormalXml) {
-        // Cenário A: Desoneração formal na NF-e (Art. 3º-A da IN RFB 1.234/2012)
-        descIsencao = Number(item.valor_icms_desonerado) || valorIcmsIsentoCalculado;
+        // Cenário A: Desoneração formal na NF-e
+        descIsencao = truncar(Number(item.valor_icms_desonerado) || valorIcmsIsentoCalculado, 2);
         valorGlosaIcms = 0.00;
         isGlosaAdministrativa = false;
-        baseCalculoIrrf = Math.max(0, valorTotal - descIsencao);
-        irrf = baseCalculoIrrf * aliquotaIrrfDecimal;
+        baseCalculoIrrf = truncar(Math.max(0, valorTotal - descIsencao), 2);
+        irrf = multiplicarETruncar(baseCalculoIrrf, aliquotaIrrfDecimal, 2);
       } else {
-        // Cenário B: NF-e emitida com CST 00 / sem vICMSDeson -> GLOSA ADMINISTRATIVA
-        // NÃO soma descIsencao para evitar duplicidade com valorGlosaIcms
+        // Cenário B: GLOSA ADMINISTRATIVA
         descIsencao = 0.00;
         valorGlosaIcms = valorIcmsIsentoCalculado;
         isGlosaAdministrativa = true;
-        baseCalculoIrrf = valorTotal; // Art. 2º, § 10 da IN RFB 1.234/12
-        irrf = baseCalculoIrrf * aliquotaIrrfDecimal;
+        baseCalculoIrrf = valorTotal;
+        irrf = multiplicarETruncar(baseCalculoIrrf, aliquotaIrrfDecimal, 2);
       }
       aliquotaIcmsDestacada = 0.00;
     } else {
@@ -107,7 +123,7 @@ export function calcularEnquadramentoItem(
       valorGlosaIcms = 0.00;
       isGlosaAdministrativa = false;
       baseCalculoIrrf = valorTotal;
-      irrf = baseCalculoIrrf * aliquotaIrrfDecimal;
+      irrf = multiplicarETruncar(baseCalculoIrrf, aliquotaIrrfDecimal, 2);
       aliquotaIcmsDestacada = 0.00;
     }
   }
@@ -130,7 +146,7 @@ export function calcularEnquadramentoItem(
   }
 
   const abatimentoTotal = isGlosaAdministrativa ? valorGlosaIcms : descIsencao;
-  const liquidoItem = Math.max(0, valorTotal - abatimentoTotal - irrf);
+  const liquidoItem = truncar(Math.max(0, valorTotal - abatimentoTotal - irrf), 2);
 
   return {
     cst,
@@ -196,10 +212,10 @@ export function getIrrfClassification(ncm: string, descricao?: string): {
 }
 
 export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON): SimulacaoMemoriaCalculo {
-  const valorBruto = Number(op.valor_operacao) || 0;
-  const descontoComercial = Number(op.valor_desconto_comercial) || 0;
+  const valorBruto = truncar(Number(op.valor_operacao) || 0, 2);
+  const descontoComercial = truncar(Number(op.valor_desconto_comercial) || 0, 2);
   const valorProdutosComDesconto = Math.max(0, valorBruto - descontoComercial);
-  const valorTotal = valorProdutosComDesconto + (Number(op.valor_frete) || 0) + (Number(op.valor_despesas) || 0);
+  const valorTotal = truncar(valorProdutosComDesconto + (Number(op.valor_frete) || 0) + (Number(op.valor_despesas) || 0), 2);
 
   const isSimples = Boolean(op.simples_remetente);
   const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
@@ -222,7 +238,9 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
   let icmsOrigem = 0;
   if (!isSimples) {
     const aliqOrigemNum = parseFloat((jsonRes.aliquotas?.aliquota_origem || '7%').replace('%', '')) || 7;
-    icmsOrigem = Number(op.icms_proprio_destacado) || (valorTotal * (aliqOrigemNum / 100));
+    icmsOrigem = Number(op.icms_proprio_destacado) !== undefined && Number(op.icms_proprio_destacado) > 0
+        ? truncar(Number(op.icms_proprio_destacado), 2)
+        : multiplicarETruncar(valorTotal, aliqOrigemNum / 100, 2);
   }
 
   const irrfClass = getIrrfClassification(op.ncm, op.descricao_produto);
@@ -246,8 +264,8 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
     icms_origem_destacado: icmsOrigem,
     valor_desconto_comercial: descontoComercial > 0 ? descontoComercial : undefined,
     desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-    economia_tributaria_total: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (enq.descIsencao + enq.valorGlosaIcms) : undefined,
-    valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorTotal - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
+    economia_tributaria_total: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(enq.descIsencao + enq.valorGlosaIcms, 2) : undefined,
+    valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(valorTotal - (enq.descIsencao + enq.valorGlosaIcms), 2) : undefined,
 
     aplica_irrf_in1234: isOrgaoPublico && !isSimples,
     aliquota_irrf_in1234: (isOrgaoPublico && !isSimples) ? enq.aliquotaIrrf : 0,
@@ -266,10 +284,10 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
   simulacaoCalculo: SimulacaoMemoriaCalculo;
   fonteAnalise: 'MOTOR_DETERMINISTICO_LOCAL';
 } {
-  const valorBruto = Number(op.valor_operacao) || 0;
-  const descontoComercial = Number(op.valor_desconto_comercial) || 0;
+  const valorBruto = truncar(Number(op.valor_operacao) || 0, 2);
+  const descontoComercial = truncar(Number(op.valor_desconto_comercial) || 0, 2);
   const valorProdutosComDesconto = Math.max(0, valorBruto - descontoComercial);
-  const valorTotal = valorProdutosComDesconto + (Number(op.valor_frete) || 0) + (Number(op.valor_despesas) || 0);
+  const valorTotal = truncar(valorProdutosComDesconto + (Number(op.valor_frete) || 0) + (Number(op.valor_despesas) || 0), 2);
 
   const isSimples = Boolean(op.simples_remetente);
   const porte = op.porte_remetente || 'ME';
@@ -418,11 +436,11 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
     base_calculo_irrf_efetiva: enq.baseCalculoIrrf,
     is_glosa_administrativa: enq.isGlosaAdministrativa,
     valor_glosa_icms: enq.valorGlosaIcms > 0 ? enq.valorGlosaIcms : undefined,
-    icms_origem_destacado: isSimples ? 0 : (op.icms_proprio_destacado || 0),
+    icms_origem_destacado: isSimples ? 0 : truncar(op.icms_proprio_destacado || 0, 2),
     valor_desconto_comercial: descontoComercial > 0 ? descontoComercial : undefined,
     desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-    economia_tributaria_total: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (enq.descIsencao + enq.valorGlosaIcms) : undefined,
-    valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorTotal - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
+    economia_tributaria_total: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(enq.descIsencao + enq.valorGlosaIcms, 2) : undefined,
+    valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(valorTotal - (enq.descIsencao + enq.valorGlosaIcms), 2) : undefined,
     aplica_irrf_in1234: isOrgaoPublico && !isSimples,
     aliquota_irrf_in1234: (isOrgaoPublico && !isSimples) ? enq.aliquotaIrrf : 0,
     codigo_retencao_irrf: (isOrgaoPublico && !isSimples) ? irrfClass.codigoRfb : 'DISPENSADO',
@@ -458,14 +476,14 @@ export function computeConsolidatedSimulation(
   let totalIcmsOrigemDestacado = 0;
 
   for (const { item, simulacao } of itens) {
-    const vBrutoItem = (item.quantidade || 1) * (item.valor_unitario || 0);
-    const vDescItem = Number(item.valor_desconto_comercial) || 0;
-    const vFreteDespItem = (Number(item.valor_frete) || 0) + (Number(item.valor_despesas) || 0);
+    const vBrutoItem = truncar((item.quantidade || 1) * (item.valor_unitario || 0), 2);
+    const vDescItem = truncar(Number(item.valor_desconto_comercial) || 0, 2);
+    const vFreteDespItem = truncar((Number(item.valor_frete) || 0) + (Number(item.valor_despesas) || 0), 2);
 
     totalValorBruto += vBrutoItem;
     totalDescontoComercial += vDescItem;
     totalFreteDespesas += vFreteDespItem;
-    totalBaseCalculo += simulacao.base_calculo_origem || (Math.max(0, vBrutoItem - vDescItem) + vFreteDespItem);
+    totalBaseCalculo += simulacao.base_calculo_origem || Math.max(0, vBrutoItem - vDescItem) + vFreteDespItem;
     totalDescontoIsencaoIcms += simulacao.desconto_isencao_orgao_publico || 0;
     totalGlosaIcms += simulacao.valor_glosa_icms || 0;
     totalBaseIrrf += simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem;
@@ -481,19 +499,19 @@ export function computeConsolidatedSimulation(
 
   return {
     total_itens_qtd: itens.length,
-    total_valor_bruto: totalValorBruto,
-    total_desconto_comercial: totalDescontoComercial,
-    total_frete_despesas: totalFreteDespesas,
-    total_base_calculo: totalBaseCalculo,
-    total_desconto_isencao_icms: totalDescontoIsencaoIcms,
-    total_glosa_icms: totalGlosaIcms,
-    total_base_irrf: totalBaseIrrf,
-    total_economia_reducao_bc: totalEconomiaReducaoBc,
-    total_economia_tributaria: totalEconomiaTributaria,
-    total_irrf_retido: totalIrrfRetido,
-    total_liquido_pagar_fornecedor: totalLiquidoPagar,
-    total_icms_recolher_mt: totalIcmsRecolherMt,
-    total_icms_origem_destacado: totalIcmsOrigemDestacado
+    total_valor_bruto: truncar(totalValorBruto, 2),
+    total_desconto_comercial: truncar(totalDescontoComercial, 2),
+    total_frete_despesas: truncar(totalFreteDespesas, 2),
+    total_base_calculo: truncar(totalBaseCalculo, 2),
+    total_desconto_isencao_icms: truncar(totalDescontoIsencaoIcms, 2),
+    total_glosa_icms: truncar(totalGlosaIcms, 2),
+    total_base_irrf: truncar(totalBaseIrrf, 2),
+    total_economia_reducao_bc: truncar(totalEconomiaReducaoBc, 2),
+    total_economia_tributaria: truncar(totalEconomiaTributaria, 2),
+    total_irrf_retido: truncar(totalIrrfRetido, 2),
+    total_liquido_pagar_fornecedor: truncar(totalLiquidoPagar, 2),
+    total_icms_recolher_mt: truncar(totalIcmsRecolherMt, 2),
+    total_icms_origem_destacado: truncar(totalIcmsOrigemDestacado, 2)
   };
 }
 
@@ -517,11 +535,11 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
   const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
 
   const itensAnalise: AnaliseItemFiscal[] = op.itens.map(it => {
-    const valorBrutoItem = (it.quantidade || 1) * (it.valor_unitario || 0);
-    const descontoItem = Number(it.valor_desconto_comercial) || 0;
-    const freteDespesasItem = (Number(it.valor_frete) || 0) + (Number(it.valor_despesas) || 0);
+    const valorBrutoItem = truncar((it.quantidade || 1) * (it.valor_unitario || 0), 2);
+    const descontoItem = truncar(Number(it.valor_desconto_comercial) || 0, 2);
+    const freteDespesasItem = truncar((Number(it.valor_frete) || 0) + (Number(it.valor_despesas) || 0), 2);
 
-    const valorLiquidoBaseItem = Math.max(0, valorBrutoItem - descontoItem) + freteDespesasItem;
+    const valorLiquidoBaseItem = truncar(Math.max(0, valorBrutoItem - descontoItem) + freteDespesasItem, 2);
 
     const enq = calcularEnquadramentoItem(
         {
@@ -557,7 +575,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       valor_glosa_icms: enq.valorGlosaIcms > 0 ? enq.valorGlosaIcms : undefined,
       valor_desconto_comercial: descontoItem > 0 ? descontoItem : undefined,
       desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
-      valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
+      valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms), 2) : undefined,
       valor_irrf_retido: enq.irrf,
       aliquota_irrf_in1234: enq.aliquotaIrrf,
       valor_liquido_pagamento_fornecedor: enq.liquidoItem
@@ -646,7 +664,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       desconto_isencao_orgao_publico: resumo.total_desconto_isencao_icms > 0 ? resumo.total_desconto_isencao_icms : undefined,
       desconto_reducao_bc_anexo_v: resumo.total_economia_reducao_bc > 0 ? resumo.total_economia_reducao_bc : undefined,
       economia_tributaria_total: resumo.total_economia_tributaria > 0 ? resumo.total_economia_tributaria : undefined,
-      valor_liquido_com_desconto: resumo.total_base_calculo - (resumo.total_desconto_isencao_icms + resumo.total_glosa_icms),
+      valor_liquido_com_desconto: truncar(resumo.total_base_calculo - (resumo.total_desconto_isencao_icms + resumo.total_glosa_icms), 2),
       valor_irrf_retido: resumo.total_irrf_retido > 0 ? resumo.total_irrf_retido : 0,
       valor_liquido_pagamento_fornecedor: resumo.total_liquido_pagar_fornecedor,
       total_recolher_mt: resumo.total_icms_recolher_mt
