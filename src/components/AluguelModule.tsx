@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Home, ShieldCheck, AlertCircle, Info, Scale, CheckCircle2 } from 'lucide-react';
+import { Header } from './Header'; // Certifique-se de que o caminho do import está correto
 import {
     identificarDocumento,
     calcularAluguelPF2026,
@@ -50,27 +51,16 @@ export const AluguelModule: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Banner Superior do Módulo */}
-            <div className="bg-[#0e3b20] border-b border-emerald-800 text-amber-50 p-5 rounded-xl shadow-md flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                    <div className="p-2.5 rounded bg-emerald-800/80 text-amber-300 border border-amber-400/40 shadow-xs">
-                        <Home className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-0.5 rounded bg-emerald-900 border border-amber-400/40 text-amber-200">
-                Módulo de Locação Predial
-              </span>
-                            <span className="text-xs text-amber-200/80 font-mono">
-                Art. 157, I da CF/88 • IN RFB nº 1.234/2012 • Lei nº 15.270/2025
-              </span>
-                        </div>
-                        <h2 className="text-lg font-serif italic text-white mt-1">
-                            Apuração de IRRF sobre Aluguéis (Imóveis Funcionais e Administrativos)
-                        </h2>
-                    </div>
-                </div>
-            </div>
+            {/* 1. Header Unificado configurado para o modo aluguel */}
+            <Header
+                modo="aluguel"
+                onLimparAluguel={() => {
+                    setDocumentoInput('');
+                    setValorBruto(0);
+                    setInssRetido(0);
+                    setDependentes(0);
+                }}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* COLUNA ESQUERDA: ENTRADA DE DADOS */}
@@ -154,9 +144,9 @@ export const AluguelModule: React.FC = () => {
 
                         {docIdentificado.tipo === 'CPF' && (
                             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
-                  Deduções Legais de Pessoa Física (Tabela Progressiva / Vigência 2026)
-                </span>
+                                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                                    Deduções Legais de Pessoa Física (Tabela Progressiva / Vigência 2026)
+                                </span>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-[11px] text-slate-600 mb-1">Previdência Oficial / INSS (R$):</label>
@@ -226,22 +216,22 @@ export const AluguelModule: React.FC = () => {
                                     <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
                                         <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">Valor Bruto do Aluguel</span>
                                         <span className="text-lg font-bold font-mono text-slate-900 mt-1 block">
-                      {formatMoney(resultado.valorBruto)}
-                    </span>
+                                            {formatMoney(resultado.valorBruto)}
+                                        </span>
                                     </div>
                                     <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-lg">
                                         <span className="text-[10px] font-mono uppercase text-emerald-800 font-semibold block">Líquido a Pagar ao Locador</span>
                                         <span className="text-lg font-bold font-mono text-emerald-900 mt-1 block">
-                      {formatMoney(resultado.valorLiquido)}
-                    </span>
+                                            {formatMoney(resultado.valorLiquido)}
+                                        </span>
                                     </div>
                                 </div>
 
                                 <div className="p-3.5 bg-sky-50 border border-sky-200 rounded-lg">
                                     <span className="text-[10px] font-mono uppercase text-sky-800 font-semibold block">Total de IR Retido na Fonte</span>
                                     <span className="text-xl font-extrabold font-mono text-sky-950 mt-1 block">
-                    {formatMoney(resultado.irrfRetido)}
-                  </span>
+                                        {formatMoney(resultado.irrfRetido)}
+                                    </span>
                                 </div>
 
                                 {/* TABELA DE MEMÓRIA DE CÁLCULO */}

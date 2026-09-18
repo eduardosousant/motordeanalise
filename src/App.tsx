@@ -11,6 +11,7 @@ import { AnalysisResultView } from './components/AnalysisResultView.tsx';
 import { FiscalPrintReport } from './components/FiscalPrintReport.tsx';
 import { Sidebar, ActiveModule } from './components/Sidebar.tsx';
 import { AluguelModule } from './components/AluguelModule.tsx';
+import { ComparadorOrcamentosSection } from './components/ComparadorOrcamentosSection.tsx';
 import {
     OperacaoComercial,
     AnaliseTributariaJSON,
@@ -385,17 +386,7 @@ export default function App() {
 
             {/* 2. Área Central de Conteúdo */}
             <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-                <Header
-                    onReset={handleReset}
-                    onPrint={handlePrint}
-                    onExportPdf={handleExportPdf}
-                    isExportingPdf={isExportingPdf}
-                    currentTheme={theme}
-                    onSelectTheme={setTheme}
-                    showThemeBar={showThemeBar}
-                    onToggleThemeBar={() => setShowThemeBar(!showThemeBar)}
-                    onXmlSelected={handleXmlSelected}
-                />
+                {/* O Header foi removido daqui da raiz para não aparecer em todos os módulos */}
 
                 <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 print:hidden">
                     {/* Barra de Seleção de Temas */}
@@ -409,7 +400,18 @@ export default function App() {
                     {/* RENDERIZAÇÃO DO MÓDULO 1: MOTOR DE TRIBUTAÇÃO ICMS (BENS) */}
                     {activeModule === 'TRIBUTACAO_ICMS' && (
                         <>
-                            {/*<ExemplosPraticosBar onSelectExemplo={handleSelectExemplo} currentTheme={theme} />*/}
+                            {/* O Header agora é renderizado exclusivamente aqui */}
+                            <Header
+                                onReset={handleReset}
+                                onPrint={handlePrint}
+                                onExportPdf={handleExportPdf}
+                                isExportingPdf={isExportingPdf}
+                                currentTheme={theme}
+                                onSelectTheme={setTheme}
+                                showThemeBar={showThemeBar}
+                                onToggleThemeBar={() => setShowThemeBar(!showThemeBar)}
+                                onXmlSelected={handleXmlSelected}
+                            />
 
                             {xmlSuccessMsg && (
                                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-3.5 rounded-xl flex items-center gap-2.5 text-xs shadow-xs">
@@ -488,6 +490,11 @@ export default function App() {
                                 Em Desenvolvimento
                             </span>
                         </div>
+                    )}
+
+                    {/* RENDERIZAÇÃO DO MÓDULO 4: COMPARADOR DE ORÇAMENTOS & ART. 18-B */}
+                    {activeModule === 'COMPARADOR_ORCAMENTOS' && (
+                            <ComparadorOrcamentosSection />
                     )}
                 </main>
 

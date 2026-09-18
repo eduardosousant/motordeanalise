@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShoppingBag, Home, FileText, Shield } from 'lucide-react';
+import { ShoppingBag, Home, FileText, Shield, Calculator } from 'lucide-react';
 import { AppTheme } from '../types.js';
 
-export type ActiveModule = 'TRIBUTACAO_ICMS' | 'ALUGUEL' | 'SERVICOS';
+export type ActiveModule = 'TRIBUTACAO_ICMS' | 'ALUGUEL' | 'SERVICOS' | 'COMPARADOR_ORCAMENTOS';
 
 interface SidebarProps {
     currentModule: ActiveModule;
@@ -112,6 +112,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             subtitle: 'ISSQN e IN RFB 1.234/2012',
             icon: FileText,
             badge: 'Em Breve'
+        },
+        {
+            id: 'COMPARADOR_ORCAMENTOS' as ActiveModule,
+            title: 'Comparador de Orçamentos',
+            subtitle: 'Análise & Art. 18-B LC 123/2006',
+            icon: Calculator,
+            badge: 'Licitações'
         }
     ];
 
@@ -130,9 +137,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Menu Options */}
             <nav className="p-3 space-y-1.5 flex-1">
-        <span className={`text-[10px] font-mono uppercase px-2 font-bold tracking-widest block mb-2 ${s.sectionLabel}`}>
-          Módulos do Sistema
-        </span>
+                <span className={`text-[10px] font-mono uppercase px-2 font-bold tracking-widest block mb-2 ${s.sectionLabel}`}>
+                    Módulos do Sistema
+                </span>
 
                 {menuItems.map(item => {
                     const Icon = item.icon;
@@ -158,8 +165,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
                                 isActive ? s.activeBadge : s.inactiveBadge
                             }`}>
-                {item.badge}
-              </span>
+                                {item.badge}
+                            </span>
                         </button>
                     );
                 })}
