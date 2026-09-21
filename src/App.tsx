@@ -337,19 +337,82 @@ export default function App() {
             const marginX = 8;
             const marginY = 8;
             const imgWidth = pageWidth - (marginX * 2);
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const pageContentHeight = pageHeight - (marginY * 2);
+            const reportRect = reportElement.getBoundingClientRect();
+            const pixelsPerCssPixel = canvas.width / reportRect.width;
+            const pixelsPerPage = Math.floor((pageContentHeight * canvas.width) / imgWidth);
+            const safeBreaks = Array.from(
+                reportElement.querySelectorAll<HTMLElement>('.pdf-page-section, .pdf-page-table tr')
+            )
+                .map((element) => {
+                    const rect = element.getBoundingClientRect();
+                    return Math.round((rect.bottom - reportRect.top) * pixelsPerCssPixel);
+                })
+                .filter((point) => point > 0 && point < canvas.height)
+                .sort((a, b) => a - b)
+                .filter((point, index, points) => index === 0 || point !== points[index - 1]);
 
-            let heightLeft = imgHeight;
-            let position = marginY;
+            const table = reportElement.querySelector<HTMLElement>('.pdf-page-table');
+            const tableHeader = table?.querySelector<HTMLElement>('thead');
+            const tableRect = table?.getBoundingClientRect();
+            const tableHeaderRect = tableHeader?.getBoundingClientRect();
+            const tableTop = tableRect
+                ? Math.round((tableRect.top - reportRect.top) * pixelsPerCssPixel)
+                : -1;
+            const tableBottom = tableRect
+                ? Math.round((tableRect.bottom - reportRect.top) * pixelsPerCssPixel)
+                : -1;
+            const tableHeaderHeight = tableHeaderRect
+                ? Math.round(tableHeaderRect.height * pixelsPerCssPixel)
+                : 0;
 
-            pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight, undefined, 'FAST');
-            heightLeft -= (pageHeight - (marginY * 2));
+            let sourceY = 0;
+            let pageNumber = 0;
+            while (sourceY < canvas.height) {
+                const repeatsTableHeader = tableTop >= 0
+                    && tableHeaderHeight > 0
+                    && sourceY > tableTop
+                    && sourceY < tableBottom;
+                const availablePixels = repeatsTableHeader
+                    ? Math.max(1, pixelsPerPage - tableHeaderHeight)
+                    : pixelsPerPage;
+                const targetY = Math.min(canvas.height, sourceY + availablePixels);
+                const nextSafeBreak = safeBreaks.findLast(
+                    (point) => point > sourceY + 2 && point <= targetY
+                );
+                const sourceEnd = nextSafeBreak ?? targetY;
+                const bodyHeight = Math.max(1, sourceEnd - sourceY);
 
-            while (heightLeft > 0) {
-                position = heightLeft - imgHeight + marginY;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight, undefined, 'FAST');
-                heightLeft -= (pageHeight - (marginY * 2));
+                if (pageNumber > 0) pdf.addPage();
+
+                let contentY = marginY;
+                if (repeatsTableHeader) {
+                    const headerCanvas = document.createElement('canvas');
+                    headerCanvas.width = canvas.width;
+                    headerCanvas.height = tableHeaderHeight;
+                    headerCanvas.getContext('2d')?.drawImage(
+                        canvas,
+                        0, tableTop, canvas.width, tableHeaderHeight,
+                        0, 0, headerCanvas.width, headerCanvas.height
+                    );
+                    const headerHeight = (headerCanvas.height * imgWidth) / headerCanvas.width;
+                    pdf.addImage(headerCanvas.toDataURL('image/png', 1.0), 'PNG', marginX, contentY, imgWidth, headerHeight, undefined, 'FAST');
+                    contentY += headerHeight;
+                }
+
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = canvas.width;
+                pageCanvas.height = bodyHeight;
+                pageCanvas.getContext('2d')?.drawImage(
+                    canvas,
+                    0, sourceY, canvas.width, bodyHeight,
+                    0, 0, pageCanvas.width, pageCanvas.height
+                );
+                const pageImageHeight = (pageCanvas.height * imgWidth) / pageCanvas.width;
+                pdf.addImage(pageCanvas.toDataURL('image/png', 1.0), 'PNG', marginX, contentY, imgWidth, pageImageHeight, undefined, 'FAST');
+
+                sourceY = sourceEnd;
+                pageNumber += 1;
             }
 
             const cnpjLimpo = operacao.cnpj_fornecedor ? operacao.cnpj_fornecedor.replace(/\D/g, '') : 'FORNECEDOR';

@@ -5,6 +5,23 @@
     min-height: 100%;
   }
 
+  @media print {
+    .pdf-page-section,
+    .pdf-page-table,
+    .pdf-page-table tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .pdf-page-table thead {
+      display: table-header-group;
+    }
+
+    .pdf-page-table tfoot {
+      display: table-row-group;
+    }
+  }
+
   body {
     background-color: #f8fafc;
     color: #0f172a;
@@ -28,4 +45,3 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f46;
 }
-

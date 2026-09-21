@@ -180,6 +180,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
 
                 {/* 1. DADOS DO FORNECEDOR E DA OPERAÇÃO */}
                 <section
+                    className="pdf-page-section"
                     style={{
                         border: '1px solid #cbd5e1',
                         borderRadius: '6px',
@@ -296,6 +297,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                 {/* 2. DISCRIMINAÇÃO DOS ITENS E ENQUADRAMENTO FISCAL */}
                 {temMultiplosItens && consolidado ? (
                     <section
+                        className="pdf-page-section pdf-table-section"
                         style={{
                             border: '1px solid #cbd5e1',
                             borderRadius: '6px',
@@ -321,7 +323,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                             </span>
                         </div>
 
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', tableLayout: 'auto' }}>
+                        <table className="pdf-page-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', tableLayout: 'auto' }}>
                             <thead>
                             <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#334155' }}>
                                 <th style={{ padding: '6px 4px', width: '18px', textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>#</th>
@@ -435,6 +437,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                 ) : (
                     /* PRODUTO ÚNICO */
                     <section
+                        className="pdf-page-section"
                         style={{
                             border: '1px solid #cbd5e1',
                             borderRadius: '6px',
@@ -534,6 +537,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
 
                 {/* 3. ALÍQUOTAS E QUADRO DE FUNDAMENTAÇÃO LEGAL */}
                 <section
+                    className="pdf-page-section"
                     style={{
                         border: '1px solid #cbd5e1',
                         borderRadius: '6px',
