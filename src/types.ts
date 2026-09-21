@@ -96,7 +96,9 @@ export interface SimulacaoMemoriaCalculo {
   aliquota_irrf_in1234?: number;
   codigo_retencao_irrf?: string;
   categoria_irrf_in1234?: string;
+  valor_irrf_calculado?: number;
   valor_irrf_retido?: number;
+  irrf_dispensa_valor_minimo?: boolean;
   justificativa_irrf_in1234?: string;
   valor_liquido_pagamento_fornecedor?: number;
 
@@ -140,6 +142,7 @@ export interface ResumoConsolidadoNota {
   total_base_irrf: number;
   total_economia_reducao_bc: number;
   total_economia_tributaria: number;
+  total_irrf_calculado: number;
   total_irrf_retido: number;
   total_liquido_pagar_fornecedor: number;
   total_icms_recolher_mt: number;

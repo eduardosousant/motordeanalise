@@ -3,7 +3,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import { fetchCnpjData } from './src/server/cnpjService.js';
 import { processTaxAnalysis, getTaxCacheStats } from './src/server/taxEngine.js';
-import { calcularEnquadramentoItem, computeConsolidatedSimulation } from './src/lib/taxCalculations.js';
+import { calcularEnquadramentoItem, computeConsolidatedSimulation, normalizarRetencaoIRRF } from './src/lib/taxCalculations.js';
 import { OperacaoComercial } from './src/types.js';
 
 async function startServer() {
@@ -113,6 +113,7 @@ async function startServer() {
             valor_desconto_comercial: descontoComercialItem > 0 ? descontoComercialItem : undefined,
             desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
             valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? (valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms)) : undefined,
+            valor_irrf_calculado: enq.irrf,
             valor_irrf_retido: enq.irrf,
             aliquota_irrf_in1234: enq.aliquotaIrrf,
             valor_liquido_pagamento_fornecedor: enq.liquidoItem,
@@ -132,6 +133,7 @@ async function startServer() {
           });
         }
 
+        normalizarRetencaoIRRF(itensAnalise);
         const resumoConsolidado = computeConsolidatedSimulation(itensAnalise);
         const primeiro = itensAnalise[0];
         const temAlgumaGlosa = itensAnalise.some(i => i.simulacao.is_glosa_administrativa);
@@ -151,6 +153,8 @@ async function startServer() {
             economia_tributaria_total: resumoConsolidado.total_economia_tributaria > 0 ? resumoConsolidado.total_economia_tributaria : undefined,
             valor_liquido_com_desconto: resumoConsolidado.total_base_calculo - (resumoConsolidado.total_desconto_isencao_icms + resumoConsolidado.total_glosa_icms),
             valor_irrf_retido: resumoConsolidado.total_irrf_retido > 0 ? resumoConsolidado.total_irrf_retido : 0,
+            valor_irrf_calculado: resumoConsolidado.total_irrf_calculado,
+            irrf_dispensa_valor_minimo: resumoConsolidado.total_irrf_calculado > 0 && resumoConsolidado.total_irrf_retido === 0,
             valor_liquido_pagamento_fornecedor: resumoConsolidado.total_liquido_pagar_fornecedor,
             total_recolher_mt: resumoConsolidado.total_icms_recolher_mt
           },

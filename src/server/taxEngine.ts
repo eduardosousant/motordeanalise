@@ -431,6 +431,7 @@ function computeSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON
   let aliquotaIrrfIn1234: number | undefined = undefined;
   let codigoRetencaoIrrf: string | undefined = undefined;
   let categoriaIrrfIn1234: string | undefined = undefined;
+  let valorIrrfCalculado: number | undefined = undefined;
   let valorIrrfRetido: number | undefined = undefined;
   let justificativaIrrfIn1234: string | undefined = undefined;
   let valorLiquidoPagamentoFornecedor: number | undefined = undefined;
@@ -450,8 +451,11 @@ function computeSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON
       aliquotaIrrfIn1234 = classifIrrf.aliquota;
       codigoRetencaoIrrf = classifIrrf.codigoRfb;
       categoriaIrrfIn1234 = classifIrrf.categoria;
-      valorIrrfRetido = valorLiquidoComDesconto * (aliquotaIrrfIn1234 / 100);
-      justificativaIrrfIn1234 = classifIrrf.justificativa;
+      valorIrrfCalculado = valorLiquidoComDesconto * (aliquotaIrrfIn1234 / 100);
+      valorIrrfRetido = valorIrrfCalculado >= 10 ? valorIrrfCalculado : 0;
+      justificativaIrrfIn1234 = valorIrrfCalculado < 10
+        ? `${classifIrrf.justificativa} Valor calculado de R$ ${valorIrrfCalculado.toFixed(2)}, inferior a R$ 10,00: demonstrado, mas dispensado da retenção por autarquia estadual sem SIAFI (Art. 3º, § 6º).`
+        : classifIrrf.justificativa;
       valorLiquidoPagamentoFornecedor = Math.max(0, valorLiquidoComDesconto - valorIrrfRetido);
     }
   }
@@ -475,7 +479,9 @@ function computeSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON
     aliquota_irrf_in1234: aliquotaIrrfIn1234,
     codigo_retencao_irrf: codigoRetencaoIrrf,
     categoria_irrf_in1234: categoriaIrrfIn1234,
+    valor_irrf_calculado: valorIrrfCalculado,
     valor_irrf_retido: valorIrrfRetido,
+    irrf_dispensa_valor_minimo: valorIrrfCalculado !== undefined && valorIrrfCalculado > 0 && valorIrrfRetido === 0,
     justificativa_irrf_in1234: justificativaIrrfIn1234,
     valor_liquido_pagamento_fornecedor: valorLiquidoPagamentoFornecedor,
 

@@ -392,7 +392,9 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                             {abatimentoItem ? `- ${formatMoney(abatimentoItem)}` : 'R$ 0,00'}
                                         </td>
                                         <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', color: it.simulacao.valor_irrf_retido ? '#b91c1c' : '#94a3b8', fontWeight: it.simulacao.valor_irrf_retido ? 700 : 400, whiteSpace: 'nowrap' }}>
-                                            {it.simulacao.valor_irrf_retido ? `- ${formatMoney(it.simulacao.valor_irrf_retido)}` : 'R$ 0,00'}
+                                            {it.simulacao.valor_irrf_calculado !== undefined
+                                                ? `${formatMoney(it.simulacao.valor_irrf_calculado)} / - ${formatMoney(it.simulacao.valor_irrf_retido || 0)}`
+                                                : (it.simulacao.valor_irrf_retido ? `- ${formatMoney(it.simulacao.valor_irrf_retido)}` : 'R$ 0,00')}
                                         </td>
                                         <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#065f46', backgroundColor: '#f0fdf4', whiteSpace: 'nowrap' }}>
                                             {formatMoney(liquidoItem)}
@@ -419,7 +421,9 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                         : 'R$ 0,00'}
                                 </td>
                                 <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b91c1c', whiteSpace: 'nowrap' }}>
-                                    {consolidado.resumoConsolidado.total_irrf_retido > 0 ? `- ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)}` : 'R$ 0,00'}
+                                    {consolidado.resumoConsolidado.total_irrf_calculado > 0
+                                        ? `${formatMoney(consolidado.resumoConsolidado.total_irrf_calculado)} / - ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)}`
+                                        : 'R$ 0,00'}
                                 </td>
                                 <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#065f46', backgroundColor: '#dcfce7', fontSize: '10px', whiteSpace: 'nowrap' }}>
                                     {formatMoney(consolidado.resumoConsolidado.total_liquido_pagar_fornecedor)}
@@ -802,6 +806,31 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                             )}
                                         </span>
                                         <span style={{ fontFamily: 'monospace' }}>- {formatMoney(simulacao.valor_irrf_retido)}</span>
+                                    </div>
+                                ) : simulacao.irrf_dispensa_valor_minimo ? (
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            fontSize: '9px',
+                                            padding: '5px 8px',
+                                            backgroundColor: '#fffbeb',
+                                            borderRadius: '4px',
+                                            border: '1px solid #fcd34d',
+                                            color: '#92400e',
+                                            fontWeight: 700
+                                        }}
+                                    >
+                                        <span>
+                                            IRRF calculado (Art. 3º, § 6º):
+                                            <span style={{ fontSize: '8px', fontWeight: 600, display: 'block' }}>
+                                                Demonstrado, mas não retido: valor inferior a R$ 10,00 (autarquia estadual sem SIAFI)
+                                            </span>
+                                        </span>
+                                        <span style={{ fontFamily: 'monospace' }}>
+                                            {formatMoney(simulacao.valor_irrf_calculado || 0)} / R$ 0,00
+                                        </span>
                                     </div>
                                 ) : (
                                     <div

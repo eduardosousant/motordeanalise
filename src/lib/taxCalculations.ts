@@ -26,6 +26,34 @@ export function multiplicarETruncar(num1: number, num2: number, casas: number = 
   return truncar(num1 * num2, casas);
 }
 
+const VALOR_MINIMO_RETENCAO_IRRF = 10;
+
+function obterValorRetidoIRRF(valorCalculado: number): number {
+  return valorCalculado >= VALOR_MINIMO_RETENCAO_IRRF ? valorCalculado : 0;
+}
+
+export function normalizarRetencaoIRRF(
+    itens: { simulacao: SimulacaoMemoriaCalculo }[]
+): void {
+  const totalCalculado = truncar(
+      itens.reduce((total, item) => total + (item.simulacao.valor_irrf_calculado ?? item.simulacao.valor_irrf_retido ?? 0), 0),
+      2
+  );
+  const totalRetido = obterValorRetidoIRRF(totalCalculado);
+
+  for (const { simulacao } of itens) {
+    const valorCalculado = truncar(simulacao.valor_irrf_calculado ?? simulacao.valor_irrf_retido ?? 0, 2);
+    const valorRetido = totalRetido > 0 ? valorCalculado : 0;
+    const abatimentos = (simulacao.desconto_isencao_orgao_publico || 0) + (simulacao.valor_glosa_icms || 0);
+    const basePagamento = Math.max(0, (simulacao.base_calculo_origem || 0) - abatimentos);
+
+    simulacao.valor_irrf_calculado = valorCalculado;
+    simulacao.valor_irrf_retido = truncar(valorRetido, 2);
+    simulacao.irrf_dispensa_valor_minimo = valorCalculado > 0 && totalRetido === 0;
+    simulacao.valor_liquido_pagamento_fornecedor = truncar(basePagamento - valorRetido, 2);
+  }
+}
+
 export function checkProductSt(ncmInput: string, _descricaoInput?: string): boolean {
   return verificarNcmNoAnexoX(ncmInput);
 }
@@ -146,7 +174,7 @@ export function calcularEnquadramentoItem(
   }
 
   const abatimentoTotal = isGlosaAdministrativa ? valorGlosaIcms : descIsencao;
-  const liquidoItem = truncar(Math.max(0, valorTotal - abatimentoTotal - irrf), 2);
+  const liquidoItem = truncar(Math.max(0, valorTotal - abatimentoTotal - obterValorRetidoIRRF(irrf)), 2);
 
   return {
     cst,
@@ -255,6 +283,9 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
   } else {
     justificativaIrrfFinal = irrfClass.justificativa;
   }
+  if (enq.irrf > 0 && enq.irrf < VALOR_MINIMO_RETENCAO_IRRF) {
+    justificativaIrrfFinal += ` Valor calculado de R$ ${enq.irrf.toFixed(2)}, inferior a R$ 10,00: demonstrado, mas dispensado da retenção para autarquia estadual sem SIAFI (Art. 3º, § 6º da IN RFB nº 1.234/2012).`;
+  }
 
   return {
     base_calculo_origem: valorTotal,
@@ -271,7 +302,9 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
     aliquota_irrf_in1234: (isOrgaoPublico && !isSimples) ? enq.aliquotaIrrf : 0,
     codigo_retencao_irrf: (isOrgaoPublico && !isSimples) ? irrfClass.codigoRfb : 'DISPENSADO',
     categoria_irrf_in1234: isSimples ? 'Simples Nacional - Isento de Retenção (Art. 4º, XI IN 1234)' : irrfClass.categoria,
-    valor_irrf_retido: enq.irrf,
+    valor_irrf_calculado: enq.irrf,
+    valor_irrf_retido: obterValorRetidoIRRF(enq.irrf),
+    irrf_dispensa_valor_minimo: enq.irrf > 0 && enq.irrf < VALOR_MINIMO_RETENCAO_IRRF,
     justificativa_irrf_in1234: justificativaIrrfFinal,
     valor_liquido_pagamento_fornecedor: enq.liquidoItem,
 
@@ -445,7 +478,9 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
     aliquota_irrf_in1234: (isOrgaoPublico && !isSimples) ? enq.aliquotaIrrf : 0,
     codigo_retencao_irrf: (isOrgaoPublico && !isSimples) ? irrfClass.codigoRfb : 'DISPENSADO',
     categoria_irrf_in1234: isSimples ? 'Simples Nacional - Isento de Retenção (Art. 4º, XI IN 1234)' : irrfClass.categoria,
-    valor_irrf_retido: enq.irrf,
+    valor_irrf_calculado: enq.irrf,
+    valor_irrf_retido: obterValorRetidoIRRF(enq.irrf),
+    irrf_dispensa_valor_minimo: enq.irrf > 0 && enq.irrf < VALOR_MINIMO_RETENCAO_IRRF,
     justificativa_irrf_in1234: isSimples ? 'Dispensa de retenção na fonte do IRRF: Fornecedor optante pelo Simples Nacional (Art. 4º, inciso XI da IN RFB nº 1.234/2012).' : orientacao,
     valor_liquido_pagamento_fornecedor: enq.liquidoItem,
     total_recolher_mt: 0
@@ -470,6 +505,7 @@ export function computeConsolidatedSimulation(
   let totalBaseIrrf = 0;
   let totalEconomiaReducaoBc = 0;
   let totalEconomiaTributaria = 0;
+  let totalIrrfCalculado = 0;
   let totalIrrfRetido = 0;
   let totalLiquidoPagar = 0;
   let totalIcmsRecolherMt = 0;
@@ -489,6 +525,7 @@ export function computeConsolidatedSimulation(
     totalBaseIrrf += simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem;
     totalEconomiaReducaoBc += simulacao.desconto_reducao_bc_anexo_v || 0;
     totalEconomiaTributaria += (simulacao.desconto_isencao_orgao_publico || 0) + (simulacao.valor_glosa_icms || 0) + (simulacao.desconto_reducao_bc_anexo_v || 0);
+    totalIrrfCalculado += simulacao.valor_irrf_calculado ?? simulacao.valor_irrf_retido ?? 0;
     totalIrrfRetido += simulacao.valor_irrf_retido || 0;
     totalLiquidoPagar += (simulacao.valor_liquido_pagamento_fornecedor !== undefined
         ? simulacao.valor_liquido_pagamento_fornecedor
@@ -508,6 +545,7 @@ export function computeConsolidatedSimulation(
     total_base_irrf: truncar(totalBaseIrrf, 2),
     total_economia_reducao_bc: truncar(totalEconomiaReducaoBc, 2),
     total_economia_tributaria: truncar(totalEconomiaTributaria, 2),
+    total_irrf_calculado: truncar(totalIrrfCalculado, 2),
     total_irrf_retido: truncar(totalIrrfRetido, 2),
     total_liquido_pagar_fornecedor: truncar(totalLiquidoPagar, 2),
     total_icms_recolher_mt: truncar(totalIcmsRecolherMt, 2),
@@ -576,6 +614,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       valor_desconto_comercial: descontoItem > 0 ? descontoItem : undefined,
       desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
       valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms), 2) : undefined,
+      valor_irrf_calculado: enq.irrf,
       valor_irrf_retido: enq.irrf,
       aliquota_irrf_in1234: enq.aliquotaIrrf,
       valor_liquido_pagamento_fornecedor: enq.liquidoItem
@@ -600,6 +639,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
     };
   });
 
+  normalizarRetencaoIRRF(itensAnalise);
   const resumo = computeConsolidatedSimulation(itensAnalise);
   const primeiro = itensAnalise[0];
 
@@ -665,7 +705,9 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       desconto_reducao_bc_anexo_v: resumo.total_economia_reducao_bc > 0 ? resumo.total_economia_reducao_bc : undefined,
       economia_tributaria_total: resumo.total_economia_tributaria > 0 ? resumo.total_economia_tributaria : undefined,
       valor_liquido_com_desconto: truncar(resumo.total_base_calculo - (resumo.total_desconto_isencao_icms + resumo.total_glosa_icms), 2),
+      valor_irrf_calculado: resumo.total_irrf_calculado,
       valor_irrf_retido: resumo.total_irrf_retido > 0 ? resumo.total_irrf_retido : 0,
+      irrf_dispensa_valor_minimo: resumo.total_irrf_calculado > 0 && resumo.total_irrf_retido === 0,
       valor_liquido_pagamento_fornecedor: resumo.total_liquido_pagar_fornecedor,
       total_recolher_mt: resumo.total_icms_recolher_mt
     },

@@ -355,13 +355,20 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                     </span>
                         </div>
                         <div className="bg-slate-800/80 p-3 rounded border border-slate-700">
-                          <span className="text-[10px] text-slate-400 block font-mono">Valor Retido de IRRF:</span>
+                          <span className="text-[10px] text-slate-400 block font-mono">IRRF calculado / retido:</span>
                           <span className="text-sm font-bold font-mono text-amber-300">
-                      - R$ {(simulacao.valor_irrf_retido || 0).toFixed(2)}
+                      {simulacao.valor_irrf_calculado !== undefined
+                          ? `R$ ${simulacao.valor_irrf_calculado.toFixed(2)} / - R$ ${(simulacao.valor_irrf_retido || 0).toFixed(2)}`
+                          : `- R$ ${(simulacao.valor_irrf_retido || 0).toFixed(2)}`}
                     </span>
                           <span className="text-[10px] text-slate-400 block mt-0.5">
                       Calculado sobre R$ {(simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem).toFixed(2)}
                     </span>
+                          {simulacao.irrf_dispensa_valor_minimo && (
+                              <span className="text-[10px] text-amber-300 block mt-1 leading-tight">
+                                Abaixo de R$ 10,00: demonstrado, sem desconto no pagamento (Art. 3º, § 6º).
+                              </span>
+                          )}
                         </div>
                         <div className="bg-slate-800/80 p-3 rounded border border-slate-700">
                           <span className="text-[10px] text-slate-400 block font-mono">Valor Líquido a Pagar ao Fornecedor:</span>
