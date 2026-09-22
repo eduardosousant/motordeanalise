@@ -11,6 +11,27 @@
       margin: 10mm;
     }
 
+    @media print {
+      body.print-report-only #root > div > *:first-child,
+      body.print-report-only #root > div > div > header,
+      body.print-report-only #root > div > div > main,
+      body.print-report-only #root > div > div > footer {
+        display: none !important;
+      }
+
+      body.print-report-only #root > div,
+      body.print-report-only #root > div > div {
+        display: block !important;
+        min-height: 0 !important;
+        height: auto !important;
+      }
+
+      body.print-report-only #fiscal-print-report {
+        display: block !important;
+        visibility: visible !important;
+      }
+    }
+
     #fiscal-print-report {
       display: block !important;
       width: 190mm !important;

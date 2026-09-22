@@ -278,6 +278,17 @@ export default function App() {
     };
 
     const handlePrint = () => {
+        if (!result) {
+            alert('Nenhuma análise tributária disponível para impressão.');
+            return;
+        }
+
+        document.body.classList.add('print-report-only');
+        const clearPrintMode = () => {
+            document.body.classList.remove('print-report-only');
+            window.removeEventListener('afterprint', clearPrintMode);
+        };
+        window.addEventListener('afterprint', clearPrintMode);
         window.print();
     };
 
