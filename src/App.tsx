@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { Header } from './components/Header.tsx';
 import { ThemeSwitcherBar } from './components/ThemeSwitcherBar.tsx';
 //import { ExemplosPraticosBar } from './components/ExemplosPraticosBar.tsx';
@@ -277,9 +275,9 @@ export default function App() {
         runAnalysis(INITIAL_OPERACAO);
     };
 
-    const handlePrint = () => {
+    const openReportPrintDialog = (source: 'print' | 'pdf') => {
         if (!result) {
-            alert('Nenhuma análise tributária disponível para impressão.');
+            alert(`Nenhuma análise tributária disponível para ${source === 'pdf' ? 'exportação' : 'impressão'}.`);
             return;
         }
 
@@ -287,138 +285,21 @@ export default function App() {
         const clearPrintMode = () => {
             document.body.classList.remove('print-report-only');
             window.removeEventListener('afterprint', clearPrintMode);
+            setIsExportingPdf(false);
         };
         window.addEventListener('afterprint', clearPrintMode);
         window.print();
     };
 
-    const handleExportPdf = async () => {
+    const handlePrint = () => openReportPrintDialog('print');
+
+    const handleExportPdf = () => {
         if (!result) {
             alert('Nenhuma análise tributária disponível para exportação.');
             return;
         }
         setIsExportingPdf(true);
-        let reportElement: HTMLElement | null = null;
-
-        try {
-            reportElement = document.getElementById('fiscal-print-report');
-            if (!reportElement) {
-                alert('Elemento do parecer tributário não foi localizado.');
-                return;
-            }
-
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const margin = 10;
-            const printableWidth = pageWidth - (margin * 2);
-            const printableWidthPx = Math.round(printableWidth * 96 / 25.4);
-            reportElement.classList.remove('hidden');
-            reportElement.classList.add('block', 'fixed', 'top-0', 'left-0', 'z-[9999]', 'bg-white');
-
-            await new Promise<void>((resolve, reject) => {
-                pdf.html(reportElement, {
-                    x: margin,
-                    y: margin,
-                    width: printableWidth,
-                    windowWidth: printableWidthPx,
-                    autoPaging: 'text',
-                    pagebreak: { mode: ['css'] },
-                    html2canvas: {
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        backgroundColor: '#ffffff',
-                        onclone: (clonedDoc) => {
-                            const styleElements = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
-                            styleElements.forEach((styleEl) => {
-                                if (styleEl.textContent && styleEl.textContent.includes('oklch')) {
-                                    styleEl.textContent = styleEl.textContent.replace(/oklch\([^)]+\)/g, 'transparent');
-                                }
-                            });
-
-                            const paginationStyle = clonedDoc.createElement('style');
-                            paginationStyle.textContent = `
-                                .pdf-page-section {
-                                    break-inside: avoid;
-                                    page-break-inside: avoid;
-                                }
-                                .pdf-table-section {
-                                    break-inside: auto !important;
-                                    page-break-inside: auto !important;
-                                }
-                                .pdf-page-table {
-                                    break-inside: auto !important;
-                                    page-break-inside: auto !important;
-                                }
-                                .pdf-page-table thead {
-                                    display: table-header-group;
-                                }
-                                .pdf-page-table tr {
-                                    break-inside: avoid;
-                                    page-break-inside: avoid;
-                                }
-                            `;
-                            clonedDoc.head.appendChild(paginationStyle);
-
-                            const clonedReport = clonedDoc.getElementById('fiscal-print-report');
-                            if (clonedReport) {
-                                clonedReport.classList.remove('hidden');
-                                clonedReport.style.display = 'block';
-                                clonedReport.style.position = 'relative';
-                                clonedReport.style.left = '0';
-                                clonedReport.style.top = '0';
-                                clonedReport.style.width = `${printableWidthPx}px`;
-                                clonedReport.style.maxWidth = `${printableWidthPx}px`;
-                                clonedReport.style.boxSizing = 'border-box';
-                                clonedReport.style.margin = '0';
-                                clonedReport.style.padding = '14px 16px';
-                                clonedReport.style.visibility = 'visible';
-                                clonedReport.style.backgroundColor = '#ffffff';
-                                clonedReport.style.color = '#0f172a';
-                                clonedReport.style.fontSize = '9.5px';
-                                clonedReport.style.lineHeight = '1.35';
-
-                                const content = clonedReport.firstElementChild as HTMLElement | null;
-                                if (content) {
-                                    content.style.gap = '8px';
-                                }
-
-                                clonedReport.querySelectorAll<HTMLElement>('.pdf-page-table').forEach((table) => {
-                                    table.style.width = '100%';
-                                    table.style.maxWidth = '100%';
-                                    table.style.tableLayout = 'fixed';
-                                    table.style.fontSize = '7px';
-                                });
-                                clonedReport.querySelectorAll<HTMLElement>('.pdf-page-table th, .pdf-page-table td').forEach((cell) => {
-                                    cell.style.padding = '3px 2px';
-                                    cell.style.overflowWrap = 'anywhere';
-                                    cell.style.wordBreak = 'break-word';
-                                });
-                            }
-                        }
-                    },
-                    callback: () => resolve()
-                }).catch(reject);
-            });
-
-            reportElement.classList.add('hidden');
-            reportElement.classList.remove('block', 'fixed', 'top-0', 'left-0', 'z-[9999]', 'bg-white');
-
-            const cnpjLimpo = operacao.cnpj_fornecedor ? operacao.cnpj_fornecedor.replace(/\D/g, '') : 'FORNECEDOR';
-            const dataHoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
-
-            pdf.save(`Parecer_Fiscal_MT_${cnpjLimpo}_${dataHoje}.pdf`);
-
-        } catch (err) {
-            console.error('Erro ao gerar PDF com jsPDF:', err);
-            alert('Erro ao gerar arquivo PDF.');
-        } finally {
-            if (reportElement) {
-                reportElement.classList.add('hidden');
-                reportElement.classList.remove('block', 'fixed', 'top-0', 'left-0', 'w-[800px]', 'z-[9999]', 'bg-white');
-            }
-            setIsExportingPdf(false);
-        }
+        openReportPrintDialog('pdf');
     };
 
     const getThemeWrapperClass = () => {
