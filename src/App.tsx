@@ -309,7 +309,7 @@ export default function App() {
                     width: pageWidth - (margin * 2),
                     windowWidth: 800,
                     autoPaging: 'text',
-                    pagebreak: { mode: ['css', 'legacy'] },
+                    pagebreak: { mode: ['css'] },
                     html2canvas: {
                         scale: 2,
                         useCORS: true,
@@ -358,6 +358,14 @@ export default function App() {
                                 clonedReport.style.visibility = 'visible';
                                 clonedReport.style.backgroundColor = '#ffffff';
                                 clonedReport.style.color = '#0f172a';
+                                clonedReport.style.padding = '18px 22px';
+                                clonedReport.style.fontSize = '9px';
+                                clonedReport.style.lineHeight = '1.3';
+
+                                const content = clonedReport.firstElementChild as HTMLElement | null;
+                                if (content) {
+                                    content.style.gap = '8px';
+                                }
                             }
                         }
                     },
