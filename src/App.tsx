@@ -329,6 +329,14 @@ export default function App() {
                                     break-inside: avoid;
                                     page-break-inside: avoid;
                                 }
+                                .pdf-table-section {
+                                    break-inside: auto !important;
+                                    page-break-inside: auto !important;
+                                }
+                                .pdf-page-table {
+                                    break-inside: auto !important;
+                                    page-break-inside: auto !important;
+                                }
                                 .pdf-page-table thead {
                                     display: table-header-group;
                                 }
