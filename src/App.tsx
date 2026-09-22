@@ -287,133 +287,78 @@ export default function App() {
             return;
         }
         setIsExportingPdf(true);
+        let reportElement: HTMLElement | null = null;
 
         try {
-            const reportElement = document.getElementById('fiscal-print-report');
+            reportElement = document.getElementById('fiscal-print-report');
             if (!reportElement) {
                 alert('Elemento do parecer tributário não foi localizado.');
                 return;
             }
 
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const margin = 8;
             reportElement.classList.remove('hidden');
-            reportElement.classList.add('block', 'fixed', 'top-0', 'left-[-9999px]', 'w-[800px]', 'z-[-9999]', 'bg-white');
+            reportElement.classList.add('block', 'fixed', 'top-0', 'left-0', 'w-[800px]', 'z-[9999]', 'bg-white');
 
-            const canvas = await html2canvas(reportElement, {
-                scale: 2.5,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                windowWidth: 800,
-                onclone: (clonedDoc) => {
-                    const styleElements = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
-                    styleElements.forEach((styleEl) => {
-                        if (styleEl.textContent && styleEl.textContent.includes('oklch')) {
-                            styleEl.textContent = styleEl.textContent.replace(/oklch\([^)]+\)/g, 'transparent');
+            await new Promise<void>((resolve, reject) => {
+                pdf.html(reportElement, {
+                    x: margin,
+                    y: margin,
+                    width: pageWidth - (margin * 2),
+                    windowWidth: 800,
+                    autoPaging: 'text',
+                    pagebreak: { mode: ['css', 'legacy'] },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                        onclone: (clonedDoc) => {
+                            const styleElements = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+                            styleElements.forEach((styleEl) => {
+                                if (styleEl.textContent && styleEl.textContent.includes('oklch')) {
+                                    styleEl.textContent = styleEl.textContent.replace(/oklch\([^)]+\)/g, 'transparent');
+                                }
+                            });
+
+                            const paginationStyle = clonedDoc.createElement('style');
+                            paginationStyle.textContent = `
+                                .pdf-page-section {
+                                    break-inside: avoid;
+                                    page-break-inside: avoid;
+                                }
+                                .pdf-page-table thead {
+                                    display: table-header-group;
+                                }
+                                .pdf-page-table tr {
+                                    break-inside: avoid;
+                                    page-break-inside: avoid;
+                                }
+                            `;
+                            clonedDoc.head.appendChild(paginationStyle);
+
+                            const clonedReport = clonedDoc.getElementById('fiscal-print-report');
+                            if (clonedReport) {
+                                clonedReport.classList.remove('hidden');
+                                clonedReport.style.display = 'block';
+                                clonedReport.style.position = 'relative';
+                                clonedReport.style.left = '0';
+                                clonedReport.style.top = '0';
+                                clonedReport.style.width = '800px';
+                                clonedReport.style.visibility = 'visible';
+                                clonedReport.style.backgroundColor = '#ffffff';
+                                clonedReport.style.color = '#0f172a';
+                            }
                         }
-                    });
-
-                    const clonedReport = clonedDoc.getElementById('fiscal-print-report');
-                    if (clonedReport) {
-                        clonedReport.style.display = 'block';
-                        clonedReport.style.position = 'relative';
-                        clonedReport.style.left = '0';
-                        clonedReport.style.top = '0';
-                        clonedReport.style.width = '800px';
-                        clonedReport.style.visibility = 'visible';
-                        clonedReport.style.backgroundColor = '#ffffff';
-                        clonedReport.style.color = '#0f172a';
-                    }
-                }
+                    },
+                    callback: () => resolve()
+                }).catch(reject);
             });
 
             reportElement.classList.add('hidden');
-            reportElement.classList.remove('block', 'fixed', 'top-0', 'left-[-9999px]', 'w-[800px]', 'z-[-9999]', 'bg-white');
-
-            const imgData = canvas.toDataURL('image/png', 1.0);
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-
-            const marginX = 8;
-            const marginY = 8;
-            const imgWidth = pageWidth - (marginX * 2);
-            const pageContentHeight = pageHeight - (marginY * 2);
-            const reportRect = reportElement.getBoundingClientRect();
-            const pixelsPerCssPixel = canvas.width / reportRect.width;
-            const pixelsPerPage = Math.floor((pageContentHeight * canvas.width) / imgWidth);
-            const safeBreaks = Array.from(
-                reportElement.querySelectorAll<HTMLElement>('.pdf-page-section, .pdf-page-table tr')
-            )
-                .map((element) => {
-                    const rect = element.getBoundingClientRect();
-                    return Math.round((rect.bottom - reportRect.top) * pixelsPerCssPixel);
-                })
-                .filter((point) => point > 0 && point < canvas.height)
-                .sort((a, b) => a - b)
-                .filter((point, index, points) => index === 0 || point !== points[index - 1]);
-
-            const table = reportElement.querySelector<HTMLElement>('.pdf-page-table');
-            const tableHeader = table?.querySelector<HTMLElement>('thead');
-            const tableRect = table?.getBoundingClientRect();
-            const tableHeaderRect = tableHeader?.getBoundingClientRect();
-            const tableTop = tableRect
-                ? Math.round((tableRect.top - reportRect.top) * pixelsPerCssPixel)
-                : -1;
-            const tableBottom = tableRect
-                ? Math.round((tableRect.bottom - reportRect.top) * pixelsPerCssPixel)
-                : -1;
-            const tableHeaderHeight = tableHeaderRect
-                ? Math.round(tableHeaderRect.height * pixelsPerCssPixel)
-                : 0;
-
-            let sourceY = 0;
-            let pageNumber = 0;
-            while (sourceY < canvas.height) {
-                const repeatsTableHeader = tableTop >= 0
-                    && tableHeaderHeight > 0
-                    && sourceY > tableTop
-                    && sourceY < tableBottom;
-                const availablePixels = repeatsTableHeader
-                    ? Math.max(1, pixelsPerPage - tableHeaderHeight)
-                    : pixelsPerPage;
-                const targetY = Math.min(canvas.height, sourceY + availablePixels);
-                const nextSafeBreak = safeBreaks.findLast(
-                    (point) => point > sourceY + 2 && point <= targetY
-                );
-                const sourceEnd = nextSafeBreak ?? targetY;
-                const bodyHeight = Math.max(1, sourceEnd - sourceY);
-
-                if (pageNumber > 0) pdf.addPage();
-
-                let contentY = marginY;
-                if (repeatsTableHeader) {
-                    const headerCanvas = document.createElement('canvas');
-                    headerCanvas.width = canvas.width;
-                    headerCanvas.height = tableHeaderHeight;
-                    headerCanvas.getContext('2d')?.drawImage(
-                        canvas,
-                        0, tableTop, canvas.width, tableHeaderHeight,
-                        0, 0, headerCanvas.width, headerCanvas.height
-                    );
-                    const headerHeight = (headerCanvas.height * imgWidth) / headerCanvas.width;
-                    pdf.addImage(headerCanvas.toDataURL('image/png', 1.0), 'PNG', marginX, contentY, imgWidth, headerHeight, undefined, 'FAST');
-                    contentY += headerHeight;
-                }
-
-                const pageCanvas = document.createElement('canvas');
-                pageCanvas.width = canvas.width;
-                pageCanvas.height = bodyHeight;
-                pageCanvas.getContext('2d')?.drawImage(
-                    canvas,
-                    0, sourceY, canvas.width, bodyHeight,
-                    0, 0, pageCanvas.width, pageCanvas.height
-                );
-                const pageImageHeight = (pageCanvas.height * imgWidth) / pageCanvas.width;
-                pdf.addImage(pageCanvas.toDataURL('image/png', 1.0), 'PNG', marginX, contentY, imgWidth, pageImageHeight, undefined, 'FAST');
-
-                sourceY = sourceEnd;
-                pageNumber += 1;
-            }
+            reportElement.classList.remove('block', 'fixed', 'top-0', 'left-0', 'w-[800px]', 'z-[9999]', 'bg-white');
 
             const cnpjLimpo = operacao.cnpj_fornecedor ? operacao.cnpj_fornecedor.replace(/\D/g, '') : 'FORNECEDOR';
             const dataHoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
@@ -424,6 +369,10 @@ export default function App() {
             console.error('Erro ao gerar PDF com jsPDF:', err);
             alert('Erro ao gerar arquivo PDF.');
         } finally {
+            if (reportElement) {
+                reportElement.classList.add('hidden');
+                reportElement.classList.remove('block', 'fixed', 'top-0', 'left-0', 'w-[800px]', 'z-[9999]', 'bg-white');
+            }
             setIsExportingPdf(false);
         }
     };
