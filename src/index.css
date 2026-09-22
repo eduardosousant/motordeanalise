@@ -6,6 +6,22 @@
   }
 
   @media print {
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+
+    #fiscal-print-report {
+      display: block !important;
+      width: 190mm !important;
+      max-width: 190mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-sizing: border-box !important;
+      font-size: 9.5px !important;
+      line-height: 1.35 !important;
+    }
+
     .pdf-page-section,
     .pdf-page-table tr {
       break-inside: avoid;

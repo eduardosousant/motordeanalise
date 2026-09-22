@@ -298,16 +298,17 @@ export default function App() {
 
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pageWidth = pdf.internal.pageSize.getWidth();
-            const margin = 8;
+            const margin = 10;
+            const printableWidth = pageWidth - (margin * 2);
             reportElement.classList.remove('hidden');
-            reportElement.classList.add('block', 'fixed', 'top-0', 'left-0', 'w-[800px]', 'z-[9999]', 'bg-white');
+            reportElement.classList.add('block', 'fixed', 'top-0', 'left-0', 'z-[9999]', 'bg-white');
 
             await new Promise<void>((resolve, reject) => {
                 pdf.html(reportElement, {
                     x: margin,
                     y: margin,
-                    width: pageWidth - (margin * 2),
-                    windowWidth: 800,
+                    width: printableWidth,
+                    windowWidth: 794,
                     autoPaging: 'text',
                     pagebreak: { mode: ['css'] },
                     html2canvas: {
@@ -354,17 +355,20 @@ export default function App() {
                                 clonedReport.style.position = 'relative';
                                 clonedReport.style.left = '0';
                                 clonedReport.style.top = '0';
-                                clonedReport.style.width = '800px';
+                                clonedReport.style.width = `${printableWidth}mm`;
+                                clonedReport.style.maxWidth = `${printableWidth}mm`;
+                                clonedReport.style.boxSizing = 'border-box';
+                                clonedReport.style.margin = '0';
+                                clonedReport.style.padding = '10mm';
                                 clonedReport.style.visibility = 'visible';
                                 clonedReport.style.backgroundColor = '#ffffff';
                                 clonedReport.style.color = '#0f172a';
-                                clonedReport.style.padding = '18px 22px';
-                                clonedReport.style.fontSize = '9px';
-                                clonedReport.style.lineHeight = '1.3';
+                                clonedReport.style.fontSize = '9.5px';
+                                clonedReport.style.lineHeight = '1.35';
 
                                 const content = clonedReport.firstElementChild as HTMLElement | null;
                                 if (content) {
-                                    content.style.gap = '8px';
+                                    content.style.gap = '10px';
                                 }
                             }
                         }
@@ -374,7 +378,7 @@ export default function App() {
             });
 
             reportElement.classList.add('hidden');
-            reportElement.classList.remove('block', 'fixed', 'top-0', 'left-0', 'w-[800px]', 'z-[9999]', 'bg-white');
+            reportElement.classList.remove('block', 'fixed', 'top-0', 'left-0', 'z-[9999]', 'bg-white');
 
             const cnpjLimpo = operacao.cnpj_fornecedor ? operacao.cnpj_fornecedor.replace(/\D/g, '') : 'FORNECEDOR';
             const dataHoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
