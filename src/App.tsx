@@ -355,11 +355,11 @@ export default function App() {
                                 clonedReport.style.position = 'relative';
                                 clonedReport.style.left = '0';
                                 clonedReport.style.top = '0';
-                                clonedReport.style.width = `${printableWidth}mm`;
-                                clonedReport.style.maxWidth = `${printableWidth}mm`;
+                                clonedReport.style.width = '794px';
+                                clonedReport.style.maxWidth = '794px';
                                 clonedReport.style.boxSizing = 'border-box';
                                 clonedReport.style.margin = '0';
-                                clonedReport.style.padding = '10mm';
+                                clonedReport.style.padding = '18px 22px';
                                 clonedReport.style.visibility = 'visible';
                                 clonedReport.style.backgroundColor = '#ffffff';
                                 clonedReport.style.color = '#0f172a';
