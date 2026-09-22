@@ -300,6 +300,7 @@ export default function App() {
             const pageWidth = pdf.internal.pageSize.getWidth();
             const margin = 10;
             const printableWidth = pageWidth - (margin * 2);
+            const printableWidthPx = Math.round(printableWidth * 96 / 25.4);
             reportElement.classList.remove('hidden');
             reportElement.classList.add('block', 'fixed', 'top-0', 'left-0', 'z-[9999]', 'bg-white');
 
@@ -308,7 +309,7 @@ export default function App() {
                     x: margin,
                     y: margin,
                     width: printableWidth,
-                    windowWidth: 794,
+                    windowWidth: printableWidthPx,
                     autoPaging: 'text',
                     pagebreak: { mode: ['css'] },
                     html2canvas: {
@@ -355,11 +356,11 @@ export default function App() {
                                 clonedReport.style.position = 'relative';
                                 clonedReport.style.left = '0';
                                 clonedReport.style.top = '0';
-                                clonedReport.style.width = '794px';
-                                clonedReport.style.maxWidth = '794px';
+                                clonedReport.style.width = `${printableWidthPx}px`;
+                                clonedReport.style.maxWidth = `${printableWidthPx}px`;
                                 clonedReport.style.boxSizing = 'border-box';
                                 clonedReport.style.margin = '0';
-                                clonedReport.style.padding = '18px 22px';
+                                clonedReport.style.padding = '14px 16px';
                                 clonedReport.style.visibility = 'visible';
                                 clonedReport.style.backgroundColor = '#ffffff';
                                 clonedReport.style.color = '#0f172a';
@@ -368,8 +369,20 @@ export default function App() {
 
                                 const content = clonedReport.firstElementChild as HTMLElement | null;
                                 if (content) {
-                                    content.style.gap = '10px';
+                                    content.style.gap = '8px';
                                 }
+
+                                clonedReport.querySelectorAll<HTMLElement>('.pdf-page-table').forEach((table) => {
+                                    table.style.width = '100%';
+                                    table.style.maxWidth = '100%';
+                                    table.style.tableLayout = 'fixed';
+                                    table.style.fontSize = '7px';
+                                });
+                                clonedReport.querySelectorAll<HTMLElement>('.pdf-page-table th, .pdf-page-table td').forEach((cell) => {
+                                    cell.style.padding = '3px 2px';
+                                    cell.style.overflowWrap = 'anywhere';
+                                    cell.style.wordBreak = 'break-word';
+                                });
                             }
                         }
                     },
