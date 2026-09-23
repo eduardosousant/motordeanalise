@@ -3,7 +3,24 @@ import autoTable from 'jspdf-autotable';
 import { AnaliseFiscalResponse } from '../types/fiscal';
 import { formatarMoeda, formatarData } from './formatters';
 
-export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
+const carregarLogoDataUrl = async (): Promise<string | null> => {
+  try {
+    const response = await fetch('/detranmt.png');
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+};
+
+export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise<Blob> {
+  const logoDataUrl = await carregarLogoDataUrl();
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -15,24 +32,36 @@ export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
   let currentY = 16;
 
   // 1. Cabeçalho Institucional
-  doc.setFillColor(6, 78, 59); // emerald-900
-  doc.rect(0, 0, pageWidth, 24, 'F');
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'PNG', marginX, 4, 19, 14);
+  }
 
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('PARECER TÉCNICO DE CONFORMIDADE FISCAL E PREVIDENCIÁRIA', marginX, 10);
+  doc.setFontSize(7.5);
+  doc.text('ESTADO DE MATO GROSSO • DETRAN-MT / GERÊNCIA DE EXECUÇÃO FINANCEIRA', marginX + 24, 7);
+  doc.setFontSize(11);
+  doc.text('PARECER TÉCNICO DE CONFORMIDADE FISCAL E PREVIDENCIÁRIA', marginX + 24, 13);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225); // slate-300
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
   doc.text(
-    'Auditoria de Adiantamentos • Suprimento de Fundos • Análise de Custo Efetivo Global & Art. 18-B (LC 123/2006)',
-    marginX,
-    16
+    'Laudo pericial • Arts. 18-B da LC 123/2006 • IN RFB nº 2.110/2022 • Enquadramento de CNAE',
+    marginX + 24,
+    18
   );
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text('DATA DA EMISSÃO', pageWidth - marginX, 7, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`${formatarData(analise.dataAnalise)}`, pageWidth - marginX, 13, { align: 'right' });
+  doc.setDrawColor(6, 78, 59);
+  doc.setLineWidth(0.7);
+  doc.line(marginX, 23, pageWidth - marginX, 23);
 
-  currentY = 32;
+  currentY = 30;
 
   // 2. Metadados do Processo
   doc.setTextColor(6, 78, 59);
@@ -95,24 +124,30 @@ export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
   currentY += 4;
 
   // Caixa de Destaque da Recomendação
+  const larguraCaixa = pageWidth - marginX * 2;
+  const larguraTexto = larguraCaixa - 8;
+  const textoRecomendacao = `PROPOSTA RECOMENDADA: ${analise.melhorOrcamento.razaoSocial}`;
+  const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, larguraTexto);
+  const linhasRecomendacao = doc.splitTextToSize(textoRecomendacao, larguraTexto);
+  const alturaCaixa = Math.max(28, 12 + linhasRecomendacao.length * 3.5 + textoParecer.length * 3.5);
+
   doc.setFillColor(241, 245, 249); // slate-100
-  doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 28, 2, 2, 'F');
+  doc.roundedRect(marginX, currentY, larguraCaixa, alturaCaixa, 2, 2, 'F');
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 28, 2, 2, 'D');
+  doc.roundedRect(marginX, currentY, larguraCaixa, alturaCaixa, 2, 2, 'D');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(21, 128, 61); // emerald-700
-  doc.text(`PROPOSTA RECOMENDADA: ${analise.melhorOrcamento.razaoSocial}`, marginX + 4, currentY + 6);
+  doc.text(linhasRecomendacao, marginX + 4, currentY + 6);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
 
-  const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, pageWidth - marginX * 2 - 8);
-  doc.text(textoParecer, marginX + 4, currentY + 12);
+  doc.text(textoParecer, marginX + 4, currentY + 8 + linhasRecomendacao.length * 3.5);
 
-  currentY += 34;
+  currentY += alturaCaixa + 6;
 
   // 4. Quadro Comparativo de Custos Efetivos e Riscos Fiscais
   doc.setFont('helvetica', 'bold');

@@ -378,7 +378,7 @@ export const ComparadorOrcamentosSection: React.FC<ComparadorOrcamentosSectionPr
 
 // Ação de Download do Parecer Técnico em PDF
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
 
     if (!analise) return;
 
@@ -386,7 +386,7 @@ export const ComparadorOrcamentosSection: React.FC<ComparadorOrcamentosSectionPr
 
     try {
 
-      const blob = gerarRelatorioPdf(analise);
+      const blob = await gerarRelatorioPdf(analise);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       const numProc = servico.numeroAdiantamento
