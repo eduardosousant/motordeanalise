@@ -15,12 +15,12 @@ export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
   let currentY = 16;
 
   // 1. Cabeçalho Institucional
-  doc.setFillColor(15, 23, 42); // slate-900
+  doc.setFillColor(6, 78, 59); // emerald-900
   doc.rect(0, 0, pageWidth, 24, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.text('PARECER TÉCNICO DE CONFORMIDADE FISCAL E PREVIDENCIÁRIA', marginX, 10);
 
   doc.setFont('helvetica', 'normal');
@@ -35,7 +35,7 @@ export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
   currentY = 32;
 
   // 2. Metadados do Processo
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(6, 78, 59);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text('1. IDENTIFICAÇÃO DO PROCESSO DE ADIANTAMENTO', marginX, currentY);
@@ -90,7 +90,7 @@ export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
   // 3. Parecer Técnico Conclusivo e Fornecedor Indicado
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(6, 78, 59);
   doc.text('2. PARECER CONCLUSIVO E RECOMENDAÇÃO TÉCNICA', marginX, currentY);
   currentY += 4;
 
@@ -166,7 +166,7 @@ export function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Blob {
     body: tableRows,
     theme: 'grid',
     headStyles: {
-      fillColor: [15, 23, 42],
+      fillColor: [6, 78, 59],
       textColor: [255, 255, 255],
       fontSize: 7.5,
       fontStyle: 'bold',

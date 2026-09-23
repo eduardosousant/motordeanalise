@@ -31,33 +31,36 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
   gerandoPdf,
 }) => {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 md:p-6 space-y-6">
+    <div
+      id="parecer-conformidade-report"
+      className="bg-white border border-slate-300 shadow-sm space-y-5 p-0 overflow-hidden"
+    >
       {/* Cabeçalho do Parecer */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+      <header className="bg-emerald-950 text-white px-5 md:px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b-2 border-emerald-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-            <Scale className="w-5 h-5 text-slate-100" />
+          <div className="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0">
+            <Scale className="w-5 h-5 text-emerald-100" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
                 Parecer Técnico de Conformidade Fiscal & Previdenciária
               </h3>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded-md font-mono">
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-900 text-emerald-100 rounded-md font-mono border border-emerald-700">
                 {analise.idAnalise}
               </span>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-md">
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-800 text-emerald-100 border border-emerald-600 rounded-md">
                 Auditoria Tributária Rigorosa
               </span>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-emerald-100/80">
               Laudo pericial fundamentado nos Arts. 18-B da LC 123/2006, IN RFB nº 2.110/2022 e enquadramento de CNAE
             </p>
           </div>
         </div>
 
         {/* Botões de Ação de Download (PDF + DOCX) */}
-        <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
+        <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto print:hidden">
           {/* Botão de Download PDF com destaque pericial */}
           <button
             type="button"
@@ -82,22 +85,26 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
             {gerandoDocx ? 'Gerando DOCX...' : 'Exportar DOCX'}
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Conteúdo do Parecer Técnico */}
-      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+      <section className="mx-5 md:mx-6 border border-slate-300 rounded-md overflow-hidden">
+        <div className="bg-slate-100 px-4 py-2 border-b border-slate-300">
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
           <FileCheck2 className="w-4 h-4 text-emerald-600" />
           Conclusão Técnica Pericial e Determinação de Menor Custo Efetivo Global
-        </h4>
-        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed font-normal">
+          </h4>
+        </div>
+        <p className="p-4 text-xs sm:text-sm text-slate-800 leading-relaxed font-normal">
           {analise.parecerConclusivo}
         </p>
-      </div>
+      </section>
 
       {/* Critérios Técnicos de Auditoria Pericial */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
-        <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
+      <section className="mx-5 md:mx-6">
+        <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 mb-2">1. Critérios Técnicos de Auditoria Pericial</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+        <div className="p-3.5 rounded-md border border-slate-300 bg-white space-y-1.5">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <ShieldCheck className="w-4 h-4 text-blue-600" />
             <span>Auditoria de Objeto Social e CNAE (RFB)</span>
@@ -107,7 +114,7 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
           </p>
         </div>
 
-        <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
+        <div className="p-3.5 rounded-md border border-slate-300 bg-white space-y-1.5">
           <div className="flex items-center gap-2 font-bold text-slate-800">
             <Scale className="w-4 h-4 text-amber-600" />
             <span>Encargo Previdenciário Patronal Compulsório (Art. 18-B)</span>
@@ -116,12 +123,13 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
             A contratação de MEI nas atividades de manutenção predial, hidráulica, eletricidade, pintura e correlatas gera fato gerador da Contribuição Previdenciária Patronal (CPP) de 20%, a ser apurada em DCTFWeb pela empresa tomadora e informada no evento S-1200/S-1210 do eSocial, integrando compulsoriamente o custo efetivo do processo.
           </p>
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* Alertas Fiscais Relevantes */}
       {analise.alertasGerais.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+        <section className="mx-5 md:mx-6 space-y-2">
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             Pontos Críticos de Atenção e Obrigações Fiscais Identificados
           </h4>
@@ -129,19 +137,19 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
             {analise.alertasGerais.map((alerta, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-lg bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5"
+                className="p-3 rounded-md bg-amber-50/70 border border-amber-200/80 text-xs text-amber-900 flex items-start gap-2.5"
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-600 mt-1.5 shrink-0" />
                 <span className="leading-relaxed">{alerta}</span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Base Legal Normativa Rigorosa */}
-      <div className="space-y-3 pt-1">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+      <section className="mx-5 md:mx-6 space-y-3 pt-1 pb-6">
+        <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
           <BookOpen className="w-4 h-4 text-blue-600" />
           Fundamentação Jurídica e Normativa Vigente
         </h4>
@@ -149,7 +157,7 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
           {analise.fundamentacaoLegal.map((fund, idx) => (
             <div
               key={idx}
-              className="p-3.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+              className="p-3.5 rounded-md border border-slate-300 bg-white hover:border-slate-400 transition-colors"
             >
               <span className="text-[11px] font-bold text-blue-800 block mb-1">
                 {fund.artigo}
@@ -163,8 +171,7 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
             </div>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 };
-
