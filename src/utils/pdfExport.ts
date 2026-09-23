@@ -64,12 +64,6 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   currentY = 30;
 
   // 2. Metadados do Processo
-  doc.setTextColor(6, 78, 59);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('1. IDENTIFICAÇÃO DO PROCESSO DE ADIANTAMENTO', marginX, currentY);
-  currentY += 4;
-
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51, 65, 85);
@@ -148,30 +142,31 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   );
 
   // 3. Parecer Técnico Conclusivo e Fornecedor Indicado
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(6, 78, 59);
-  doc.text('2. PARECER CONCLUSIVO E RECOMENDAÇÃO TÉCNICA', marginX, currentY);
-  currentY += 4;
-
-  // Caixa de Destaque da Recomendação
   const larguraCaixa = pageWidth - marginX * 2;
   const larguraTexto = larguraCaixa - 8;
   const textoRecomendacao = `PROPOSTA RECOMENDADA: ${analise.melhorOrcamento.razaoSocial}`;
   const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, larguraTexto);
   const linhasRecomendacao = doc.splitTextToSize(textoRecomendacao, larguraTexto);
-  const alturaCaixa = Math.max(28, 12 + linhasRecomendacao.length * 3.5 + textoParecer.length * 3.5);
+  const alturaCabecalho = 8;
+  const alturaCaixa = Math.max(34, alturaCabecalho + 10 + linhasRecomendacao.length * 3.5 + textoParecer.length * 3.5);
 
   const inicioQuadroConclusao = currentY;
-  doc.setFillColor(241, 245, 249); // slate-100
+  doc.setFillColor(255, 255, 255);
   doc.roundedRect(marginX, inicioQuadroConclusao, larguraCaixa, alturaCaixa, 2, 2, 'F');
   doc.setDrawColor(203, 213, 225);
   doc.roundedRect(marginX, inicioQuadroConclusao, larguraCaixa, alturaCaixa, 2, 2, 'D');
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(marginX, inicioQuadroConclusao, larguraCaixa, alturaCabecalho, 2, 2, 'F');
+  doc.rect(marginX, inicioQuadroConclusao + 4, larguraCaixa, 4, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(6, 78, 59);
+  doc.text('2. PARECER CONCLUSIVO E RECOMENDAÇÃO TÉCNICA', marginX + 4, inicioQuadroConclusao + 5.3);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(21, 128, 61); // emerald-700
-  doc.text(linhasRecomendacao, marginX + 4, inicioQuadroConclusao + 6, {
+  doc.text(linhasRecomendacao, marginX + 4, inicioQuadroConclusao + alturaCabecalho + 6, {
     maxWidth: larguraTexto,
   });
 
@@ -179,9 +174,8 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
 
-  doc.text(textoParecer, marginX + 4, inicioQuadroConclusao + 8 + linhasRecomendacao.length * 3.5, {
+  doc.text(textoParecer, marginX + 4, inicioQuadroConclusao + alturaCabecalho + 8 + linhasRecomendacao.length * 3.5, {
     maxWidth: larguraTexto,
-    align: 'justify',
     lineHeightFactor: 1.35,
   });
 
@@ -347,7 +341,6 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   );
   doc.text(textoFechamento, marginX, currentY, {
     maxWidth: pageWidth - marginX * 2,
-    align: 'justify',
   });
 
   return doc.output('blob');
