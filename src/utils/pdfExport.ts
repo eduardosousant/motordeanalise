@@ -113,9 +113,9 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
       lineWidth: 0.25,
     },
     columnStyles: {
-      0: { cellWidth: 63 },
-      1: { cellWidth: 58 },
-      2: { cellWidth: 55 },
+      0: { cellWidth: (pageWidth - marginX * 2) / 3 },
+      1: { cellWidth: (pageWidth - marginX * 2) / 3 },
+      2: { cellWidth: (pageWidth - marginX * 2) / 3 },
     },
     margin: { left: marginX, right: marginX },
     didParseCell: data => {
@@ -143,7 +143,7 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
 
   // 3. Parecer Técnico Conclusivo e Fornecedor Indicado
   const larguraCaixa = pageWidth - marginX * 2;
-  const larguraTexto = larguraCaixa - 8;
+  const larguraTexto = larguraCaixa - 4;
   const textoRecomendacao = `PROPOSTA RECOMENDADA: ${analise.melhorOrcamento.razaoSocial}`;
   const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, larguraTexto);
   const linhasRecomendacao = doc.splitTextToSize(textoRecomendacao, larguraTexto);
@@ -166,16 +166,14 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(21, 128, 61); // emerald-700
-  doc.text(linhasRecomendacao, marginX + 4, inicioQuadroConclusao + alturaCabecalho + 6, {
-    maxWidth: larguraTexto,
-  });
+  doc.text(linhasRecomendacao, marginX + 2, inicioQuadroConclusao + alturaCabecalho + 6);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
 
-  doc.text(textoParecer, marginX + 4, inicioQuadroConclusao + alturaCabecalho + 8 + linhasRecomendacao.length * 3.5, {
-    maxWidth: larguraTexto,
+  doc.text(textoParecer, marginX + 2, inicioQuadroConclusao + alturaCabecalho + 8 + linhasRecomendacao.length * 3.5, {
+    align: 'justify',
     lineHeightFactor: 1.35,
   });
 
@@ -313,7 +311,7 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(3, 105, 161);
-    doc.text(`[Norma] ${f.artigo} - ${f.titulo}`, marginX + 2, currentY);
+    doc.text(`* ${f.artigo} - ${f.titulo}`, marginX + 2, currentY);
     currentY += 3.5;
 
     doc.setFont('helvetica', 'normal');
