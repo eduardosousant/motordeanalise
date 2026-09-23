@@ -143,12 +143,18 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
 
   // 3. Parecer Técnico Conclusivo e Fornecedor Indicado
   const larguraCaixa = pageWidth - marginX * 2;
-  const larguraTexto = larguraCaixa - 4;
+  const larguraTexto = larguraCaixa - 8;
   const textoRecomendacao = `PROPOSTA RECOMENDADA: ${analise.melhorOrcamento.razaoSocial}`;
   const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, larguraTexto);
   const linhasRecomendacao = doc.splitTextToSize(textoRecomendacao, larguraTexto);
   const alturaCabecalho = 8;
-  const alturaCaixa = Math.max(34, alturaCabecalho + 10 + linhasRecomendacao.length * 3.5 + textoParecer.length * 3.5);
+  const alturaLinhaRecomendacao = 3.8;
+  const alturaLinhaParecer = 3.7;
+  const alturaCaixa = Math.max(
+    34,
+    alturaCabecalho + 5 + linhasRecomendacao.length * alturaLinhaRecomendacao
+      + 3 + textoParecer.length * alturaLinhaParecer + 5
+  );
 
   const inicioQuadroConclusao = currentY;
   doc.setFillColor(255, 255, 255);
@@ -166,15 +172,19 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(21, 128, 61); // emerald-700
-  doc.text(linhasRecomendacao, marginX + 2, inicioQuadroConclusao + alturaCabecalho + 6);
+  linhasRecomendacao.forEach((linha, index) => {
+    doc.text(linha, marginX + 4, inicioQuadroConclusao + alturaCabecalho + 5 + index * alturaLinhaRecomendacao);
+  });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
-
-  doc.text(textoParecer, marginX + 2, inicioQuadroConclusao + alturaCabecalho + 8 + linhasRecomendacao.length * 3.5, {
-    align: 'justify',
-    lineHeightFactor: 1.35,
+  const inicioTextoParecer = inicioQuadroConclusao
+    + alturaCabecalho
+    + 7
+    + linhasRecomendacao.length * alturaLinhaRecomendacao;
+  textoParecer.forEach((linha, index) => {
+    doc.text(linha, marginX + 4, inicioTextoParecer + index * alturaLinhaParecer);
   });
 
   currentY += alturaCaixa + 6;
