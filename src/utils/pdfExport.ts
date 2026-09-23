@@ -68,7 +68,7 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text('1. IDENTIFICAÇÃO DO PROCESSO DE ADIANTAMENTO', marginX, currentY);
-  currentY += 5;
+  currentY += 4;
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
@@ -81,40 +81,71 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
 
   const dadosIdentificacao = [
     [
-      `Processo / Protocolo: ${numProc}`,
-      `Data do Parecer: ${dataFormatada}`,
-      `Identificador: ${analise.idAnalise}`,
+      `Processo / Protocolo:\n${numProc}`,
+      `Data do Parecer:\n${dataFormatada}`,
+      `Identificador:\n${analise.idAnalise}`,
     ],
     [
-      `Responsável / Solicitante: ${responsavel}`,
-      `Centro de Custos: ${centroCusto}`,
-      `CNAE do Serviço: ${analise.servico.cnae}`,
+      `Responsável / Solicitante:\n${responsavel}`,
+      `Centro de Custos:\n${centroCusto}`,
+      `CNAE do Serviço:\n${analise.servico.cnae || 'Não informado'}`,
     ],
     [
-      `Objeto do Serviço: ${analise.servico.descricao}`,
+      `Objeto do Serviço:\n${analise.servico.descricao || 'Não informado'}`,
       '',
-      `Descrição CNAE: ${analise.descricaoCnaeServico}`,
+      `Descrição CNAE:\n${analise.descricaoCnaeServico || 'Não informado'}`,
     ],
   ];
 
+  const inicioQuadroIdentificacao = currentY;
+  doc.setFillColor(241, 245, 249);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(marginX, inicioQuadroIdentificacao, pageWidth - marginX * 2, 7, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(6, 78, 59);
+  doc.text('1. QUALIFICAÇÃO DO PROCESSO E DADOS DO ADIANTAMENTO', marginX + 4, inicioQuadroIdentificacao + 4.7);
+
   autoTable(doc, {
-    startY: currentY,
+    startY: inicioQuadroIdentificacao + 7,
     body: dadosIdentificacao,
-    theme: 'plain',
+    theme: 'grid',
     styles: {
-      fontSize: 8,
-      cellPadding: 1.5,
+      fontSize: 7.8,
+      cellPadding: 2.2,
       textColor: [51, 65, 85],
+      valign: 'middle',
+      lineColor: [226, 232, 240],
+      lineWidth: 0.25,
     },
     columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 70 },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 50 },
+      0: { cellWidth: 63 },
+      1: { cellWidth: 58 },
+      2: { cellWidth: 55 },
     },
     margin: { left: marginX, right: marginX },
+    didParseCell: data => {
+      if (data.cell.text.length > 0) {
+        data.cell.text = data.cell.text.flatMap(line => {
+          const separator = line.indexOf('\n');
+          if (separator < 0) return [line];
+          return [line.slice(0, separator), line.slice(separator + 1)];
+        });
+        data.cell.styles.fontStyle = 'normal';
+      }
+    },
   });
 
   currentY = (doc as any).lastAutoTable.finalY + 6;
+  doc.roundedRect(
+    marginX,
+    inicioQuadroIdentificacao,
+    pageWidth - marginX * 2,
+    (doc as any).lastAutoTable.finalY - inicioQuadroIdentificacao,
+    2,
+    2,
+    'D'
+  );
 
   // 3. Parecer Técnico Conclusivo e Fornecedor Indicado
   doc.setFont('helvetica', 'bold');
@@ -131,21 +162,28 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   const linhasRecomendacao = doc.splitTextToSize(textoRecomendacao, larguraTexto);
   const alturaCaixa = Math.max(28, 12 + linhasRecomendacao.length * 3.5 + textoParecer.length * 3.5);
 
+  const inicioQuadroConclusao = currentY;
   doc.setFillColor(241, 245, 249); // slate-100
-  doc.roundedRect(marginX, currentY, larguraCaixa, alturaCaixa, 2, 2, 'F');
+  doc.roundedRect(marginX, inicioQuadroConclusao, larguraCaixa, alturaCaixa, 2, 2, 'F');
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(marginX, currentY, larguraCaixa, alturaCaixa, 2, 2, 'D');
+  doc.roundedRect(marginX, inicioQuadroConclusao, larguraCaixa, alturaCaixa, 2, 2, 'D');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(21, 128, 61); // emerald-700
-  doc.text(linhasRecomendacao, marginX + 4, currentY + 6);
+  doc.text(linhasRecomendacao, marginX + 4, inicioQuadroConclusao + 6, {
+    maxWidth: larguraTexto,
+  });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
 
-  doc.text(textoParecer, marginX + 4, currentY + 8 + linhasRecomendacao.length * 3.5);
+  doc.text(textoParecer, marginX + 4, inicioQuadroConclusao + 8 + linhasRecomendacao.length * 3.5, {
+    maxWidth: larguraTexto,
+    align: 'justify',
+    lineHeightFactor: 1.35,
+  });
 
   currentY += alturaCaixa + 6;
 
@@ -292,45 +330,25 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
     currentY += splitNorma.length * 3.5 + 2.5;
   });
 
-  // 7. Bloco de Assinaturas e Fechamento Pericial
-  if (currentY > 240) {
+  // 7. Fechamento Pericial
+  if (currentY > 260) {
     doc.addPage();
-    currentY = 20;
+    currentY = 16;
   } else {
-    currentY += 8;
+    currentY += 6;
   }
 
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(
+  const textoFechamento = doc.splitTextToSize(
     'Parecer emitido em conformidade com as instruções normativas da Receita Federal do Brasil e os princípios da economicidade, razoabilidade e estrita legalidade tributária.',
-    marginX,
-    currentY
+    pageWidth - marginX * 2
   );
-
-  currentY += 16;
-
-  // Linhas de Assinatura
-  const colWidth = (pageWidth - marginX * 2) / 2;
-
-  doc.setDrawColor(148, 163, 184);
-  doc.line(marginX + 10, currentY, marginX + colWidth - 10, currentY);
-  doc.line(marginX + colWidth + 10, currentY, pageWidth - marginX - 10, currentY);
-
-  currentY += 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(30, 41, 59);
-  doc.text('Analista de Conformidade Fiscal / Tributária', marginX + colWidth / 2, currentY, { align: 'center' });
-  doc.text('Responsável pela Tomada de Contas do Adiantamento', marginX + colWidth + colWidth / 2, currentY, { align: 'center' });
-
-  currentY += 3.5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text('Controladoria Interna • CRC / OAB', marginX + colWidth / 2, currentY, { align: 'center' });
-  doc.text(`${responsavel} • Matrícula / Protocolo`, marginX + colWidth + colWidth / 2, currentY, { align: 'center' });
+  doc.text(textoFechamento, marginX, currentY, {
+    maxWidth: pageWidth - marginX * 2,
+    align: 'justify',
+  });
 
   return doc.output('blob');
 }
