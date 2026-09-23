@@ -30,37 +30,62 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
   onDownloadPdf,
   gerandoPdf,
 }) => {
+  const dataEmissao = new Date(analise.dataAnalise || Date.now()).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const horaEmissao = new Date(analise.dataAnalise || Date.now()).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
   return (
     <div
       id="parecer-conformidade-report"
       className="bg-white border border-slate-300 shadow-sm space-y-5 p-0 overflow-hidden"
     >
       {/* Cabeçalho do Parecer */}
-      <header className="bg-emerald-950 text-white px-5 md:px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b-2 border-emerald-800">
+      <header className="mx-5 md:mx-6 mt-5 pb-3 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b-2 border-emerald-900">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0">
-            <Scale className="w-5 h-5 text-emerald-100" />
-          </div>
+          <img
+            src="/detranmt.png"
+            alt="Logotipo institucional"
+            className="h-12 w-auto max-w-[120px] object-contain shrink-0"
+          />
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
-                Parecer Técnico de Conformidade Fiscal & Previdenciária
-              </h3>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-900 text-emerald-100 rounded-md font-mono border border-emerald-700">
+              <div className="text-[9.5px] font-extrabold tracking-wide text-slate-900 uppercase">
+                ESTADO DE MATO GROSSO <span className="text-slate-300">•</span> DETRAN-MT / Gerência de Execução Financeira
+              </div>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded-md font-mono">
                 {analise.idAnalise}
               </span>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-800 text-emerald-100 border border-emerald-600 rounded-md">
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-[13.5px] font-extrabold text-slate-900 uppercase tracking-wide">
+                Parecer Técnico de Conformidade Fiscal & Previdenciária
+              </h3>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md">
                 Auditoria Tributária Rigorosa
               </span>
             </div>
-            <p className="text-xs text-emerald-100/80">
-              Laudo pericial fundamentado nos Arts. 18-B da LC 123/2006, IN RFB nº 2.110/2022 e enquadramento de CNAE
+            <p className="text-[8.5px] text-slate-600">
+              Laudo pericial • Arts. 18-B da LC 123/2006 • IN RFB nº 2.110/2022 • Enquadramento de CNAE
             </p>
           </div>
         </div>
 
-        {/* Botões de Ação de Download (PDF + DOCX) */}
-        <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto print:hidden">
+        <div className="flex flex-col items-end gap-2">
+          <div className="text-right min-w-[150px]">
+            <div className="text-[8.5px] uppercase text-slate-500 font-bold tracking-wide">Data da Emissão</div>
+            <div className="text-[11px] font-extrabold text-slate-900 font-mono mt-0.5">
+              {dataEmissao} às {horaEmissao}
+            </div>
+          </div>
+
+          {/* Botões de Ação de Download (PDF + DOCX) */}
+          <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto print:hidden">
           {/* Botão de Download PDF com destaque pericial */}
           <button
             type="button"
@@ -84,6 +109,7 @@ export const ParecerFiscalCard: React.FC<ParecerFiscalCardProps> = ({
             <FileDown className="w-4 h-4 text-slate-600" />
             {gerandoDocx ? 'Gerando DOCX...' : 'Exportar DOCX'}
           </button>
+          </div>
         </div>
       </header>
 
