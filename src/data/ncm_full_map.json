@@ -61200,11 +61200,11 @@
     "darf": "6147"
   },
   "68053090": {
-    "statusSt": "NAO_ST",
-    "tabela": "-",
-    "segmento": "-",
-    "cest": "-",
-    "descricao": "Outros",
+    "statusSt": "ST",
+    "tabela": "Tabela XII",
+    "segmento": "Materiais de limpeza",
+    "cest": "11.009.00",
+    "descricao": "Esponja Multiuso",
     "irrf": 1.2,
     "darf": "6147"
   },
