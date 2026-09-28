@@ -141,19 +141,31 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
     'D'
   );
 
-  // 3. Parecer Técnico Conclusivo e Fornecedor Indicado
+// 3. Parecer Técnico Conclusivo e Fornecedor Indicado
   const larguraCaixa = pageWidth - marginX * 2;
-  const larguraTexto = larguraCaixa - 8;
-  const textoRecomendacao = `PROPOSTA RECOMENDADA: ${analise.melhorOrcamento.razaoSocial}`;
-  const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, larguraTexto);
+  const paddingX = 3.5;
+  const larguraTexto = larguraCaixa - paddingX * 2;
+
+  // IMPORTANTE: Definir fontes e tamanhos antes de calcular a quebra de linha
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+
+  const prefixoRecomendacao = 'PROPOSTA RECOMENDADA: ';
+  const nomeFornecedor = analise.melhorOrcamento.razaoSocial;
+  const textoRecomendacao = `${prefixoRecomendacao}${nomeFornecedor}`;
   const linhasRecomendacao = doc.splitTextToSize(textoRecomendacao, larguraTexto);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  const textoParecer = doc.splitTextToSize(analise.parecerConclusivo, larguraTexto);
+
   const alturaCabecalho = 8;
-  const alturaLinhaRecomendacao = 3.8;
-  const alturaLinhaParecer = 3.7;
+  const alturaLinhaRecomendacao = 4.2;
+  const alturaLinhaParecer = 3.6;
   const alturaCaixa = Math.max(
-    34,
-    alturaCabecalho + 5 + linhasRecomendacao.length * alturaLinhaRecomendacao
-      + 3 + textoParecer.length * alturaLinhaParecer + 5
+      34,
+      alturaCabecalho + 5 + linhasRecomendacao.length * alturaLinhaRecomendacao
+      + 3 + textoParecer.length * alturaLinhaParecer + 4
   );
 
   const inicioQuadroConclusao = currentY;
@@ -169,54 +181,68 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   doc.setTextColor(6, 78, 59);
   doc.text('2. PARECER CONCLUSIVO E RECOMENDAÇÃO TÉCNICA', marginX + 4, inicioQuadroConclusao + 5.3);
 
+  // Renderização da Recomendação com cor diferenciada no nome
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.setTextColor(21, 128, 61); // emerald-700
-  linhasRecomendacao.forEach((linha, index) => {
-    doc.text(linha, marginX + 4, inicioQuadroConclusao + alturaCabecalho + 5 + index * alturaLinhaRecomendacao);
-  });
 
+  const posYRecomendacao = inicioQuadroConclusao + alturaCabecalho + 5;
+  const larguraPrefixo = doc.getTextWidth(prefixoRecomendacao);
+
+  // 1. Prefixo em cinzento-escuro neutro
+  doc.setTextColor(30, 41, 59);
+  doc.text(prefixoRecomendacao, marginX + paddingX, posYRecomendacao);
+
+  // 2. Razão Social com cor de destaque (ex.: Azul Royal Intenso [2, 132, 199])
+  // Outras sugestões: Verde Esmeralda [4, 120, 87] ou Âmbar/Dourado [217, 119, 6]
+  doc.setTextColor(2, 132, 199);
+  doc.text(nomeFornecedor, marginX + paddingX + larguraPrefixo, posYRecomendacao);
+
+  // Renderização do Parecer (distribuído até o limite direito)
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(15, 23, 42);
   const inicioTextoParecer = inicioQuadroConclusao
-    + alturaCabecalho
-    + 7
-    + linhasRecomendacao.length * alturaLinhaRecomendacao;
+      + alturaCabecalho
+      + 6
+      + linhasRecomendacao.length * alturaLinhaRecomendacao;
   textoParecer.forEach((linha, index) => {
-    doc.text(linha, marginX + 4, inicioTextoParecer + index * alturaLinhaParecer);
+    doc.text(linha, marginX + paddingX, inicioTextoParecer + index * alturaLinhaParecer);
   });
 
   currentY += alturaCaixa + 6;
 
-  // 4. Quadro Comparativo de Custos Efetivos e Riscos Fiscais
+// 4. Quadro Comparativo de Custos Efetivos e Riscos Fiscais (Seção 3 no PDF)
+  const inicioQuadroSecao3 = currentY;
+
+  // Cabeçalho estilizado do Quadro 3
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(marginX, inicioQuadroSecao3, pageWidth - marginX * 2, 7, 2, 2, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text('3. QUADRO DEMONSTRATIVO DE CUSTO EFETIVO GLOBAL', marginX, currentY);
-  currentY += 3;
+  doc.setFontSize(8);
+  doc.setTextColor(6, 78, 59);
+  doc.text('3. QUADRO DEMONSTRATIVO DE CUSTO EFETIVO GLOBAL', marginX + 4, inicioQuadroSecao3 + 4.7);
 
   const tableRows = analise.resultados.map((r, idx) => {
     let compatTexto = 'Incompatível';
     if (r.compatibilidadeCNAE === 'compativel') {
       compatTexto = r.origemCompatibilidade === 'secundario'
-        ? `Compatível (Secundário)\n[${r.cnaeCompativelEncontrado}]`
-        : `Compatível (Principal)\n[${r.cnaePrestador}]`;
+          ? `Compatível (Secundário)\n[${r.cnaeCompativelEncontrado}]`
+          : `Compatível (Principal)\n[${r.cnaePrestador}]`;
     } else if (r.compatibilidadeCNAE === 'parcial') {
       compatTexto = `Subclasse\n[${r.cnaePrestador}]`;
     }
 
     const incideTexto = r.incideCPP18B
-      ? `Sim (20%)\n+${formatarMoeda(r.valorCPP)}`
-      : 'Não (0%)';
+        ? `Sim (20%)\n+${formatarMoeda(r.valorCPP)}`
+        : 'Não (0%)';
 
     const diferencaTexto = r.diferencaParaMelhor === 0
-      ? 'MENOR CUSTO'
-      : `+${formatarMoeda(r.diferencaParaMelhor)}\n(+${((r.diferencaPercentual || 0) * 100).toFixed(1)}%)`;
+        ? 'MENOR CUSTO'
+        : `+${formatarMoeda(r.diferencaParaMelhor)}\n(+${((r.diferencaPercentual || 0) * 100).toFixed(1)}%)`;
 
     return [
       String(idx + 1),
-      `${r.razaoSocial}\nCNPJ: ${r.cnpj}\n(${r.regimeTributario.replace('_', ' ')})`,
+      `${r.razaoSocial}\nCNPJ: ${r.cnpj}\n(${r.regimeTributario.replace('_', ' ')}\)`,
       formatarMoeda(r.valorNominal),
       incideTexto,
       formatarMoeda(r.custoEfetivoTotal),
@@ -226,7 +252,7 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
   });
 
   autoTable(doc, {
-    startY: currentY,
+    startY: inicioQuadroSecao3 + 7,
     head: [
       [
         'Pos.',
@@ -264,75 +290,130 @@ export async function gerarRelatorioPdf(analise: AnaliseFiscalResponse): Promise
     margin: { left: marginX, right: marginX },
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 6;
+  currentY = (doc as any).lastAutoTable.finalY;
+  // Borda externa do Quadro 3 englobando a tabela
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(marginX, inicioQuadroSecao3, pageWidth - marginX * 2, currentY - inicioQuadroSecao3, 2, 2, 'D');
 
-  // 5. Análise de Compatibilidade de CNAE
-  if (currentY > 230) {
+  currentY += 6;
+
+  // 5. Análise de Compatibilidade de CNAE (Seção 4 no PDF)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+
+  // Calcula altura necessária antes de desenhar o quadro para evitar quebra no meio
+  let alturaSecao4 = 8; // Altura do cabeçalho
+  const itensSecao4 = analise.resultados.map(r => {
+    const texto = doc.splitTextToSize(r.justificativaCnae, pageWidth - marginX * 2 - 8);
+    const alturaItem = 4 + 3.5 + (texto.length * 3.6); // margem topo + titulo + linhas
+    alturaSecao4 += alturaItem;
+    return { r, texto };
+  });
+  alturaSecao4 += 3; // padding do fundo
+
+  if (currentY + alturaSecao4 > 270) {
     doc.addPage();
     currentY = 16;
   }
 
+  const inicioQuadroSecao4 = currentY;
+  // Fundo e borda do quadro
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(marginX, inicioQuadroSecao4, pageWidth - marginX * 2, alturaSecao4, 2, 2, 'F');
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(marginX, inicioQuadroSecao4, pageWidth - marginX * 2, alturaSecao4, 2, 2, 'D');
+
+  // Cabeçalho da Seção 4
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(marginX, inicioQuadroSecao4, pageWidth - marginX * 2, 8, 2, 2, 'F');
+  doc.rect(marginX, inicioQuadroSecao4 + 4, pageWidth - marginX * 2, 4, 'F'); // Preenche canto inferior do header
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text('4. AUDITORIA DE COMPATIBILIDADE DE CNAE (PRINCIPAL E SECUNDÁRIOS)', marginX, currentY);
-  currentY += 4;
+  doc.setFontSize(8);
+  doc.setTextColor(6, 78, 59);
+  doc.text('4. AUDITORIA DE COMPATIBILIDADE DE CNAE (PRINCIPAL E SECUNDÁRIOS)', marginX + 4, inicioQuadroSecao4 + 5.3);
 
-  analise.resultados.forEach(r => {
-    if (currentY > 260) {
-      doc.addPage();
-      currentY = 16;
-    }
+  let currentYInside4 = inicioQuadroSecao4 + 8;
 
+  itensSecao4.forEach(item => {
+    currentYInside4 += 4.5;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(30, 41, 59);
-    doc.text(`• ${r.razaoSocial} (CNPJ: ${r.cnpj}) - CNAE: ${r.cnaeCompativelEncontrado || r.cnaePrestador}:`, marginX + 2, currentY);
-    currentY += 3.5;
+    doc.text(`• ${item.r.razaoSocial} (CNPJ: ${item.r.cnpj}) - CNAE: ${item.r.cnaeCompativelEncontrado || item.r.cnaePrestador}:`, marginX + 4, currentYInside4);
+
+    currentYInside4 += 4;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.setTextColor(r.compatibilidadeCNAE === 'compativel' ? 21 : r.compatibilidadeCNAE === 'parcial' ? 217 : 220, r.compatibilidadeCNAE === 'compativel' ? 128 : r.compatibilidadeCNAE === 'parcial' ? 119 : 38, r.compatibilidadeCNAE === 'compativel' ? 61 : r.compatibilidadeCNAE === 'parcial' ? 6 : 38);
+    const isCompat = item.r.compatibilidadeCNAE === 'compativel';
+    const isParcial = item.r.compatibilidadeCNAE === 'parcial';
+    doc.setTextColor(isCompat ? 21 : isParcial ? 217 : 220, isCompat ? 128 : isParcial ? 119 : 38, isCompat ? 61 : isParcial ? 6 : 38);
 
-    const splitJust = doc.splitTextToSize(r.justificativaCnae, pageWidth - marginX * 2 - 6);
-    doc.text(splitJust, marginX + 4, currentY);
-    currentY += splitJust.length * 3.5 + 2;
+    item.texto.forEach((linha: string, index: number) => {
+      doc.text(linha, marginX + 6, currentYInside4 + index * 3.6);
+    });
+    currentYInside4 += item.texto.length * 3.6 - 1;
   });
 
-  // 6. Fundamentação Legal e Normativa
-  if (currentY > 220) {
+  currentY = inicioQuadroSecao4 + alturaSecao4 + 6;
+
+  // 6. Fundamentação Legal e Normativa (Seção 5 no PDF)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+
+  // Calcula altura necessária
+  let alturaSecao5 = 8;
+  const itensSecao5 = analise.fundamentacaoLegal.map(f => {
+    const texto = doc.splitTextToSize(f.resumo, pageWidth - marginX * 2 - 8);
+    const alturaItem = 4 + 3.5 + (texto.length * 3.6);
+    alturaSecao5 += alturaItem;
+    return { f, texto };
+  });
+  alturaSecao5 += 3;
+
+  if (currentY + alturaSecao5 > 270) {
     doc.addPage();
     currentY = 16;
   }
 
-  currentY += 4;
+  const inicioQuadroSecao5 = currentY;
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(marginX, inicioQuadroSecao5, pageWidth - marginX * 2, alturaSecao5, 2, 2, 'F');
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(marginX, inicioQuadroSecao5, pageWidth - marginX * 2, alturaSecao5, 2, 2, 'D');
+
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(marginX, inicioQuadroSecao5, pageWidth - marginX * 2, 8, 2, 2, 'F');
+  doc.rect(marginX, inicioQuadroSecao5 + 4, pageWidth - marginX * 2, 4, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text('5. FUNDAMENTAÇÃO LEGAL E OBRIGAÇÕES ACESSÓRIAS', marginX, currentY);
-  currentY += 4;
+  doc.setFontSize(8);
+  doc.setTextColor(6, 78, 59);
+  doc.text('5. FUNDAMENTAÇÃO LEGAL E OBRIGAÇÕES ACESSÓRIAS', marginX + 4, inicioQuadroSecao5 + 5.3);
 
-  analise.fundamentacaoLegal.forEach(f => {
-    if (currentY > 260) {
-      doc.addPage();
-      currentY = 16;
-    }
+  let currentYInside5 = inicioQuadroSecao5 + 8;
 
+  itensSecao5.forEach(item => {
+    currentYInside5 += 4.5;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(3, 105, 161);
-    doc.text(`* ${f.artigo} - ${f.titulo}`, marginX + 2, currentY);
-    currentY += 3.5;
+    doc.text(`* ${item.f.artigo} - ${item.f.titulo}`, marginX + 4, currentYInside5);
+
+    currentYInside5 += 4;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    const splitNorma = doc.splitTextToSize(f.resumo, pageWidth - marginX * 2 - 6);
-    doc.text(splitNorma, marginX + 4, currentY);
-    currentY += splitNorma.length * 3.5 + 2.5;
+
+    item.texto.forEach((linha: string, index: number) => {
+      doc.text(linha, marginX + 6, currentYInside5 + index * 3.6);
+    });
+    currentYInside5 += item.texto.length * 3.6 - 1;
   });
 
-  // 7. Fechamento Pericial
+  currentY = inicioQuadroSecao5 + alturaSecao5 + 6;
+
+  // 7. Fechamento Pericial  // 7. Fechamento Pericial
   if (currentY > 260) {
     doc.addPage();
     currentY = 16;
