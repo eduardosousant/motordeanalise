@@ -1,6 +1,8 @@
-import React from 'react';
-import { Plus, Trash2, PackageCheck, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, PackageCheck, Search } from 'lucide-react';
 import { ItemNotaFiscal, AppTheme, FinalidadeCompra } from '../types.js';
+import { NcmSearchModal } from './NcmSearchModal.tsx';
+import { NcmSearchResult } from '../data/ncmDatabase.js';
 
 interface MultiItemManagerProps {
   itens: ItemNotaFiscal[];
@@ -13,6 +15,8 @@ export const MultiItemManager: React.FC<MultiItemManagerProps> = ({
                                                                     itens,
                                                                     onChangeItens
                                                                   }) => {
+  const [linhaNcmAtiva, setLinhaNcmAtiva] = useState<number | null>(null);
+
   const handleItemChange = (index: number, field: keyof ItemNotaFiscal, value: any) => {
     const updated = [...itens];
     const item = { ...updated[index], [field]: value };
@@ -54,6 +58,18 @@ export const MultiItemManager: React.FC<MultiItemManagerProps> = ({
     onChangeItens(updated);
   };
 
+  const handleNcmSelecionado = (item: NcmSearchResult) => {
+    if (linhaNcmAtiva === null) return;
+    const updated = [...itens];
+    updated[linhaNcmAtiva] = {
+      ...updated[linhaNcmAtiva],
+      ncm: item.codigo,
+      descricao: item.descricao
+    };
+    onChangeItens(updated);
+    setLinhaNcmAtiva(null);
+  };
+
   const totalBruto = itens.reduce((acc, curr) => acc + (curr.quantidade * curr.valor_unitario), 0);
   const totalDesconto = itens.reduce((acc, curr) => acc + (curr.valor_desconto_comercial || 0), 0);
   const totalLiquido = totalBruto - totalDesconto;
@@ -81,7 +97,7 @@ export const MultiItemManager: React.FC<MultiItemManagerProps> = ({
             <thead>
             <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold text-[11px] uppercase">
               <th className="py-2.5 px-2 text-center w-10">#</th>
-              <th className="py-2.5 px-3 w-32">NCM</th>
+              <th className="py-2.5 px-3 w-40">NCM</th>
               <th className="py-2.5 px-3">Descrição da Mercadoria</th>
               <th className="py-2.5 px-2 text-center w-16">Qtd</th>
               <th className="py-2.5 px-3 text-right w-28">V. Unit (R$)</th>
@@ -97,13 +113,24 @@ export const MultiItemManager: React.FC<MultiItemManagerProps> = ({
                     {idx + 1}
                   </td>
                   <td className="py-2 px-3">
-                    <input
-                        type="text"
-                        value={item.ncm}
-                        onChange={(e) => handleItemChange(idx, 'ncm', e.target.value)}
-                        placeholder="0000.00.00"
-                        className="w-full px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold text-emerald-800 text-xs focus:ring-1 focus:ring-emerald-600 focus:outline-none"
-                    />
+                    <div className="flex gap-1.5">
+                      <input
+                          type="text"
+                          value={item.ncm}
+                          onChange={(e) => handleItemChange(idx, 'ncm', e.target.value)}
+                          placeholder="0000.00.00"
+                          className="min-w-0 w-full px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold text-emerald-800 text-xs focus:ring-1 focus:ring-emerald-600 focus:outline-none"
+                      />
+                      <button
+                          type="button"
+                          title="Buscar NCM"
+                          aria-label={`Buscar NCM para o item ${idx + 1}`}
+                          onClick={() => setLinhaNcmAtiva(idx)}
+                          className="shrink-0 rounded border border-slate-300 bg-slate-50 p-1 text-slate-500 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                      >
+                        <Search className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                   <td className="py-2 px-3">
                     <input
@@ -181,6 +208,11 @@ export const MultiItemManager: React.FC<MultiItemManagerProps> = ({
             </tfoot>
           </table>
         </div>
+        <NcmSearchModal
+          isOpen={linhaNcmAtiva !== null}
+          onClose={() => setLinhaNcmAtiva(null)}
+          onSelect={handleNcmSelecionado}
+        />
       </div>
   );
 };
