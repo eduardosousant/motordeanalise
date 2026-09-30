@@ -38142,10 +38142,10 @@
     "darf": "8767 (Distrib./Varejo) / 6147 (Produtor/Import.)"
   },
   "34012090": {
-    "statusSt": "NAO_ST",
-    "tabela": "-",
-    "segmento": "-",
-    "cest": "-",
+    "statusSt": "ST",
+    "tabela": "Tabela XII",
+    "segmento": "Materiais de limpeza",
+    "cest": "11.002.00",
     "descricao": "Outros",
     "irrf": 1.2,
     "darf": "6147"
