@@ -6,6 +6,7 @@ import {
     AnaliseConsolidadaNota
 } from '../types.js';
 import { getCstInfo, checkProductSt } from '../lib/taxCalculations.js';
+import { formatarCNPJ } from '../utils/formatters.js';
 
 interface FiscalPrintReportProps {
     data: AnaliseTributariaJSON;
@@ -60,7 +61,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
     // Texto de instrução e enquadramento formatado de forma dinâmica para Multi-Itens ou Item Único
     const textoOrientacaoConsolidado = temMultiplosItens && consolidado
         ? (isOptanteSimples
-            ? `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 102/500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`
+            ? `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 102/500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`
             : `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) Operação com ${consolidado.itensAnalise.length} itens.${isGlosa ? ' Identificada GLOSA ADMINISTRATIVA em itens sem desoneração formal. Conforme Art. 2º, § 10 da IN RFB nº 1.234/2012, a retenção de IRRF incide sobre o valor original da nota.' : ''} 2) Retenção na fonte de IRRF apurada ITEM A ITEM, totalizando ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)} no pagamento.`)
         : isGlosa
             ? `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & Conv. 73/04): 1) REGIME NORMAL (CST 40): Isenção de ICMS obrigatória não destacada formalmente na NF-e. Glosa administrativa de 17% aplicada no pagamento. 2) Instrução Normativa RFB nº 1.234/2012, Art. 2º, § 10: “§ 10. Em caso de pagamentos com glosa de valores constantes da nota fiscal, sem emissão de nova nota fiscal, a retenção deverá incidir sobre o valor original da nota.” Retenção de 1,20% sobre ${formatMoney(simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem)}.`
@@ -222,7 +223,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                     CNPJ do Estabelecimento:
                                 </span>
                                 <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontSize: '11px', display: 'block', marginTop: '1px' }}>
-                                    {data.resumo_fornecedor.cnpj || operacao.cnpj_fornecedor || '00.000.000/0000-00'}
+                                    {formatarCNPJ(operacao.cnpj_fornecedor || data.resumo_fornecedor.cnpj || '00000000000000')}
                                 </strong>
                             </div>
 
@@ -664,7 +665,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                             4. Fechamento Financeiro e Memória de Cálculo da Despesa
                         </span>
                         <span style={{ fontSize: '9px', fontWeight: 700, color: '#a7f3d0' }}>
-                            Liquidação da Fatura & Arrecadação SEFAZ/MT
+                            Instruções para Faturamento, Ateste e Liquidação
                         </span>
                     </div>
 
@@ -877,7 +878,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                 </div>
                             </div>
 
-                            {/* Coluna Direita: Obrigações SEFAZ/MT */}
+                            {/* Coluna Direita: Instruções de faturamento e liquidação */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <div
                                     style={{
@@ -885,60 +886,17 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                         padding: '8px 10px',
                                         borderRadius: '4px',
                                         border: '1px solid #cbd5e1',
-                                        height: '100%',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-between'
+                                        height: '100%'
                                     }}
                                 >
-                                    <div>
-                                        <span style={{ fontSize: '8.5px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', display: 'block', letterSpacing: '0.3px' }}>
-                                            Arrecadação Estadual SEFAZ/MT
-                                        </span>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9.5px', marginTop: '4px' }}>
-                                            <span style={{ color: '#64748b' }}>ICMS Substituição Tributária (ST):</span>
-                                            <strong style={{ fontFamily: 'monospace', color: '#0f172a' }}>{formatMoney(simulacao.icms_st_devido || 0)}</strong>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9.5px', marginTop: '3px' }}>
-                                            <span style={{ color: '#64748b' }}>ICMS DIFAL MT:</span>
-                                            <strong style={{ fontFamily: 'monospace', color: '#0f172a' }}>{formatMoney(simulacao.difal_devido || 0)}</strong>
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            borderTop: '1px solid #cbd5e1',
-                                            paddingTop: '6px',
-                                            marginTop: '6px',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center'
-                                        }}
-                                    >
-                                        <span style={{ fontSize: '9.5px', fontWeight: 800, color: '#0f172a' }}>TOTAL ICMS MT A RECOLHER:</span>
-                                        <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#064e3b', fontFamily: 'monospace' }}>
-                                            {formatMoney(simulacao.total_recolher_mt)}
-                                        </span>
-                                    </div>
+                                    <strong style={{ fontSize: '8.5px', fontWeight: 700, color: '#475569', display: 'block', letterSpacing: '0.3px', marginBottom: '5px' }}>
+                                        Instruções para Faturamento, Ateste e Liquidação:
+                                    </strong>
+                                    <p style={{ fontSize: '9px', color: '#1e293b', lineHeight: 1.45, textAlign: 'justify', margin: 0 }}>
+                                        {textoOrientacaoConsolidado}
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Caixa de Orientação Conclusiva de Faturamento e Pagamento */}
-                        <div
-                            style={{
-                                backgroundColor: '#f8fafc',
-                                borderLeft: '3.5px solid #064e3b',
-                                padding: '6px 10px',
-                                fontSize: '9px',
-                                color: '#1e293b',
-                                borderRadius: '0 4px 4px 0',
-                                lineHeight: 1.45,
-                                textAlign: 'justify'
-                            }}
-                        >
-                            <strong style={{ color: '#064e3b' }}>Instruções para Faturamento, Ateste e Liquidação: </strong>
-                            {textoOrientacaoConsolidado}
                         </div>
                     </div>
                 </section>
