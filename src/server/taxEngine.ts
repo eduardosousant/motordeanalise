@@ -35,6 +35,22 @@ function normalizeNcm(ncm: string): string {
   return ncm.replace(/\D/g, '');
 }
 
+function applyOperationSupplier(
+  jsonResponse: AnaliseTributariaJSON,
+  operacao: OperacaoComercial
+): AnaliseTributariaJSON {
+  return {
+    ...jsonResponse,
+    resumo_fornecedor: {
+      ...jsonResponse.resumo_fornecedor,
+      cnpj: operacao.cnpj_fornecedor || jsonResponse.resumo_fornecedor.cnpj,
+      ...(operacao.razao_social_fornecedor
+        ? { razao_social: operacao.razao_social_fornecedor }
+        : {})
+    }
+  };
+}
+
 function buildCacheKey(op: OperacaoComercial): string {
   const ncmClean = normalizeNcm(op.ncm);
   const ufOrigem = (op.uf_origem || 'SP').toUpperCase();
@@ -126,10 +142,11 @@ export async function processTaxAnalysis(operacao: OperacaoComercial): Promise<{
     const cachedEntry = cacheMap[cacheKey];
     console.info(`[TAX ENGINE CACHE HIT] Análise recuperada da base local para NCM ${operacao.ncm} (${cacheKey}). Sem consumo de API/Cota.`);
 
-    const simulacao = computeSimulation(operacao, cachedEntry.jsonResponse);
+    const jsonResponse = applyOperationSupplier(cachedEntry.jsonResponse, operacao);
+    const simulacao = computeSimulation(operacao, jsonResponse);
 
     return {
-      jsonResponse: cachedEntry.jsonResponse,
+      jsonResponse,
       simulacaoCalculo: simulacao,
       fonteAnalise: 'CACHE_AI_LOCAL'
     };
@@ -298,6 +315,7 @@ FORMATO ESTRITO DE RESPOSTA JSON EXIGIDO:
       }
 
       if (parsedJson) {
+        parsedJson = applyOperationSupplier(parsedJson, operacao);
         cacheMap[cacheKey] = {
           cacheKey,
           createdAt: new Date().toISOString(),

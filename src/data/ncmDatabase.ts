@@ -27,6 +27,47 @@ export interface NcmEntryMT {
 // 10.515 NCMs carregados da base oficial
 export const NCM_ANEXO_X_MAP: Record<string, NcmEntryMT> = ncmFullMapData as Record<string, NcmEntryMT>;
 
+export interface NcmSearchResult {
+  codigo: string;
+  descricao: string;
+  statusSt: NcmEntryMT['statusSt'];
+}
+
+const normalizarTextoBusca = (texto: string): string =>
+  texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+/**
+ * Pesquisa NCMs na base local para seleção no formulário de operação.
+ * O limite evita renderizar uma lista excessiva no modal.
+ */
+export function buscarNcms(termo: string, limite = 50): NcmSearchResult[] {
+  const termoTexto = normalizarTextoBusca(termo.trim());
+  const termoCodigo = termo.replace(/\D/g, '');
+
+  if (termoTexto.length < 2 && termoCodigo.length < 2) return [];
+
+  return Object.entries(NCM_ANEXO_X_MAP)
+    .map(([codigo, item]) => ({
+      codigo,
+      descricao: item.descricao.replace(/^[-\s]+/, ''),
+      statusSt: item.statusSt
+    }))
+    .filter((item) => {
+      const descricao = normalizarTextoBusca(item.descricao);
+      return (
+        (termoCodigo.length >= 2 && item.codigo.includes(termoCodigo)) ||
+        (termoTexto.length >= 2 && descricao.includes(termoTexto))
+      );
+    })
+    .sort((a, b) => {
+      const aCodigo = termoCodigo.length >= 2 && a.codigo.startsWith(termoCodigo);
+      const bCodigo = termoCodigo.length >= 2 && b.codigo.startsWith(termoCodigo);
+      if (aCodigo !== bCodigo) return aCodigo ? -1 : 1;
+      return a.codigo.localeCompare(b.codigo);
+    })
+    .slice(0, limite);
+}
+
 /**
  * Função de higienização e formatação de NCM
  */
