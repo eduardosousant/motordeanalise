@@ -294,13 +294,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                     <span className="text-[10.5px] text-emerald-800 block mt-0.5">Liquidação da despesa</span>
                   </div>
 
-                  <div className="bg-white border-l-4 border-teal-600 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                    <span className="text-[10px] font-mono uppercase text-teal-800 font-semibold block tracking-wider">Total ICMS a Recolher MT</span>
-                    <span className="text-sm sm:text-base font-bold text-teal-700 mt-1 block font-mono">
-                  {(simulacao.total_recolher_mt || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-                    <span className="text-[10.5px] text-slate-500 block mt-0.5">Via DAR-1 / GNRE MT</span>
-                  </div>
                 </div>
 
                 {/* Resumo Fornecedor & Impacto do Porte */}
@@ -437,13 +430,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                     <span className="text-[10.5px] text-emerald-800 block mt-0.5">Liquidação total da nota</span>
                   </div>
 
-                  <div className="bg-white border-l-4 border-teal-600 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                    <span className="text-[10px] font-mono uppercase text-teal-800 font-semibold block tracking-wider">Total ICMS a Recolher MT</span>
-                    <span className="text-sm sm:text-base font-bold text-teal-700 mt-1 block font-mono">
-                  {(consolidado.resumoConsolidado.total_recolher_mt || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-                    <span className="text-[10.5px] text-slate-500 block mt-0.5">Via DAR-1 / GNRE MT</span>
-                  </div>
                 </div>
 
                 {/* Tabela Detalhada com os Itens da Nota */}
@@ -455,9 +441,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         Grade e Enquadramento Fiscal dos Produtos ({consolidado.itensAnalise.length} itens)
                       </h4>
                     </div>
-                    <span className="text-xs font-mono font-bold bg-teal-50 text-teal-800 px-2.5 py-1 rounded border border-teal-200">
-                  Total ICMS a Recolher MT: {consolidado.resumoConsolidado.total_icms_recolher_mt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
                   </div>
 
                   <div className="overflow-x-auto">
@@ -475,7 +458,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         <th className="py-3 px-3 text-right text-amber-800">Desc./Glosa ICMS</th>
                         <th className="py-3 px-3 text-right text-sky-800">IRRF</th>
                         <th className="py-3 px-3 text-right text-emerald-800">Líquido Item</th>
-                        <th className="py-3 px-3 text-right">ICMS MT</th>
                       </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 font-sans">
@@ -556,9 +538,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                               <td className="py-3 px-3 text-right font-mono font-bold text-emerald-800 bg-emerald-50/40">
                                 {liquidoItem.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                               </td>
-                              <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                                {sim.total_recolher_mt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                              </td>
                             </tr>
                         );
                       })}
@@ -583,9 +562,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         </td>
                         <td className="py-3.5 px-3 text-right font-mono text-emerald-900 bg-emerald-100/60 text-sm">
                           {consolidado.resumoConsolidado.total_liquido_pagar_fornecedor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </td>
-                        <td className="py-3.5 px-3 text-right font-mono text-teal-900">
-                          {consolidado.resumoConsolidado.total_icms_recolher_mt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </td>
                       </tr>
                       </tfoot>
@@ -801,12 +777,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                       </div>
                   )}
 
-                  <div className="flex justify-between pt-3 text-sm font-bold text-emerald-950 bg-emerald-50 p-4 rounded border border-emerald-300">
-                    <span>VALOR TOTAL A RECOLHER EM FAVOR DA SEFAZ/MT:</span>
-                    <span className="text-emerald-900 font-mono text-base">
-                  R$ {simulacao.total_recolher_mt.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                  </div>
                 </div>
               </div>
           )}
@@ -845,8 +815,7 @@ ${simulacao.valor_desconto_comercial ? `2. Desconto Comercial: - R$ ${simulacao.
 4. ICMS Destacado na Origem (${data.aliquotas.aliquota_origem || '7%'}): R$ ${simulacao.icms_origem_destacado.toFixed(2)}
 ${simulacao.is_glosa_administrativa ? `5. Glosa Administrativa de ICMS: - R$ ${(simulacao.valor_glosa_icms || 0).toFixed(2)}` : (simulacao.desconto_isencao_orgao_publico !== undefined ? `5. Desoneração ICMS Órgão Público: - R$ ${simulacao.desconto_isencao_orgao_publico.toFixed(2)}` : '')}
 ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquota_irrf_in1234}% - Cód. ${simulacao.codigo_retencao_irrf}): - R$ ${(simulacao.valor_irrf_retido || 0).toFixed(2)}` : '6. Retenção IRRF IN 1234: DISPENSADO (Simples Nacional)'}
-7. Valor Líquido Fornecedor: R$ ${(simulacao.valor_liquido_pagamento_fornecedor || (simulacao.base_calculo_origem - (simulacao.valor_irrf_retido || 0))).toFixed(2)}
-8. Total Recolher SEFAZ/MT: R$ ${simulacao.total_recolher_mt.toFixed(2)}`;
+7. Valor Líquido Fornecedor: R$ ${(simulacao.valor_liquido_pagamento_fornecedor || (simulacao.base_calculo_origem - (simulacao.valor_irrf_retido || 0))).toFixed(2)}`;
                           navigator.clipboard.writeText(debugText);
                           setCopied(true);
                           setTimeout(() => setCopied(false), 2000);
