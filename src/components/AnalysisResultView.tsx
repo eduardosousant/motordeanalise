@@ -26,6 +26,7 @@ import { getCstInfo } from '../lib/taxCalculations.js';
 interface AnalysisResultViewProps {
   data: AnaliseTributariaJSON;
   simulacao: SimulacaoMemoriaCalculo;
+  optanteSimples?: boolean;
   fonteAnalise?: 'CACHE_AI_LOCAL' | 'GEMINI_AI_AO_VIVO' | 'MOTOR_DETERMINISTICO_LOCAL';
   currentTheme?: AppTheme;
   consolidado?: AnaliseConsolidadaNota | null;
@@ -34,6 +35,7 @@ interface AnalysisResultViewProps {
 export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                                                                         data,
                                                                         simulacao,
+                                                                        optanteSimples,
                                                                         fonteAnalise,
                                                                         currentTheme = 'GOV_CLASSIC',
                                                                         consolidado
@@ -41,6 +43,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
   const [activeTab, setActiveTab] = useState<'EXECUTIVA' | 'GRADE_ITENS' | 'LEGAL' | 'CALCULO' | 'DEBUG'>('EXECUTIVA');
   const [copied, setCopied] = useState(false);
   const temMultiplosItens = Boolean(consolidado && consolidado.itensAnalise && consolidado.itensAnalise.length > 1);
+  const isOptanteSimples = optanteSimples ?? data.resumo_fornecedor.optante_simples;
 
   // Se a mercadoria tiver direito à isenção (ou estiver sob Glosa Administrativa), o parecer técnico SEMPRE sugere CST 40
   const cstInfoSingle = (simulacao.is_glosa_administrativa || (simulacao.desconto_isencao_orgao_publico && simulacao.desconto_isencao_orgao_publico > 0))
@@ -51,7 +54,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
         descricaoCompleta: 'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I c/c Convênio ICMS 73/2004)',
         badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
       }
-      : getCstInfo(data, simulacao, data.resumo_fornecedor.optante_simples);
+      : getCstInfo(data, simulacao, isOptanteSimples);
 
   const valorBrutoTotal = simulacao.base_calculo_origem + (simulacao.valor_desconto_comercial || 0);
 
@@ -304,7 +307,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                   </h4>
                   <div className="text-xs text-slate-700 space-y-1">
                     <p className="font-mono text-slate-800">
-                      <strong>CNPJ:</strong> {data.resumo_fornecedor.cnpj} | <strong>Porte:</strong> {data.resumo_fornecedor.porte} | <strong>Optante pelo Simples Nacional:</strong> {data.resumo_fornecedor.optante_simples ? 'SIM' : 'NÃO'}
+                      <strong>CNPJ:</strong> {data.resumo_fornecedor.cnpj} | <strong>Porte:</strong> {data.resumo_fornecedor.porte} | <strong>Optante pelo Simples Nacional:</strong> {isOptanteSimples ? 'SIM' : 'NÃO'}
                     </p>
                     <div className="bg-slate-50 border border-slate-200 p-3 rounded text-slate-800 text-xs mt-2 leading-relaxed font-sans">
                       <strong className="text-teal-800">Impacto Tributário do Porte:</strong> {data.resumo_fornecedor.impacto_tributario_porte}
@@ -473,7 +476,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                               descricaoCompleta: 'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I c/c Convênio 73/2004)',
                               badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
                             }
-                            : getCstInfo(resp, sim, data.resumo_fornecedor?.optante_simples);
+                            : getCstInfo(resp, sim, isOptanteSimples);
 
                         const valorBrutoItem = (item.quantidade || 1) * (item.valor_unitario || 0);
                         const liquidoItem = sim.valor_liquido_pagamento_fornecedor !== undefined
@@ -723,7 +726,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                           <strong>Orientação de Execução Financeira:</strong> Produto fora da ST com direito à isenção (Art. 2º Anexo I / Art. 65 Anexo IV do RICMS/MT), porém a NF-e foi emitida sem a dedução formal (CST 00/sem vICMSDeson)[cite: 3]. O Órgão Público deve realizar a <strong>glosa administrativa de 17%</strong> na liquidação da fatura. Conforme <strong>Art. 2º, § 10 da IN RFB nº 1.234/2012</strong>, a retenção de IRRF deve incidir sobre o <strong>valor original da nota</strong>.
                         </p>
                       </div>
-                  ) : (simulacao.desconto_isencao_orgao_publico !== undefined && !cstInfoSingle.codigo.includes('60') && !cstInfoSingle.codigo.includes('500') && !data.resumo_fornecedor.optante_simples) ? (
+                  ) : (simulacao.desconto_isencao_orgao_publico !== undefined && !cstInfoSingle.codigo.includes('60') && !cstInfoSingle.codigo.includes('500') && !isOptanteSimples) ? (
                       <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded text-emerald-950 space-y-1.5 my-2 font-sans">
                         <div className="flex justify-between font-bold text-emerald-900 font-mono text-xs">
                           <span>🏛️ ISENÇÃO ICMS ÓRGÃO PÚBLICO ESTADUAL (Conv. 73/04 & Art. 2º Anexo I):</span>
@@ -740,7 +743,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                           <span className="text-sm font-semibold">Sem Desconto na Nota</span>
                         </div>
                         <p className="text-[11px] text-blue-900/90 leading-relaxed">
-                          <strong>Orientação de Execução Financeira:</strong> {data.resumo_fornecedor.optante_simples ? 'Fornecedor Optante pelo Simples Nacional. Conforme OT CGE 03/2026, a isenção do Art. 65 Anexo IV não se aplica a optantes do Simples Nacional.' : 'Produto sujeito à Substituição Tributária (ST). Conforme Art. 65, § 3º do Anexo IV, mercadorias em ST não gozam de isenção.'} A Nota Fiscal apresentada está <strong>CORRETA pelo Valor Integral</strong> (sem desconto de ICMS).
+                          <strong>Orientação de Execução Financeira:</strong> {isOptanteSimples ? 'Fornecedor Optante pelo Simples Nacional. Conforme OT CGE 03/2026, a isenção do Art. 65 Anexo IV não se aplica a optantes do Simples Nacional.' : 'Produto sujeito à Substituição Tributária (ST). Conforme Art. 65, § 3º do Anexo IV, mercadorias em ST não gozam de isenção.'} A Nota Fiscal apresentada está <strong>CORRETA pelo Valor Integral</strong> (sem desconto de ICMS).
                         </p>
                       </div>
                   ) : null}
@@ -808,7 +811,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                           const debugText = `AUDITORIA FISCAL - MEMÓRIA DE CÁLCULO
 NCM: ${data.enquadramento_produto.ncm} (${data.enquadramento_produto.descricao})
 Regime: ${data.enquadramento_produto.regime_tributario_aplicavel}
-Fornecedor: ${data.resumo_fornecedor.cnpj} (${data.resumo_fornecedor.optante_simples ? 'Simples Nacional' : 'Regime Normal'} - ${data.resumo_fornecedor.porte})
+Fornecedor: ${data.resumo_fornecedor.cnpj} (${isOptanteSimples ? 'Simples Nacional' : 'Regime Normal'} - ${data.resumo_fornecedor.porte})
 
 1. Total Bruto Faturado: R$ ${valorBrutoTotal.toFixed(2)}
 ${simulacao.valor_desconto_comercial ? `2. Desconto Comercial: - R$ ${simulacao.valor_desconto_comercial.toFixed(2)}\n3. Base Líquida: R$ ${simulacao.base_calculo_origem.toFixed(2)}` : `2. Base de Cálculo da Operação: R$ ${simulacao.base_calculo_origem.toFixed(2)}`}
@@ -1096,7 +1099,7 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                       <div className="flex justify-between">
                         <span className="text-slate-500">Enquadramento Fornecedor:</span>
                         <span className="font-bold text-slate-800">
-                      {data.resumo_fornecedor.optante_simples ? 'Simples Nacional' : 'Regime Normal'} ({data.resumo_fornecedor.porte})
+                      {isOptanteSimples ? 'Simples Nacional' : 'Regime Normal'} ({data.resumo_fornecedor.porte})
                     </span>
                       </div>
                       <div className="flex justify-between">

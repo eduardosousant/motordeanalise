@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Printer, Download, RotateCcw, ExternalLink, FileUp, ShieldCheck, Sparkles, RefreshCw, Home } from 'lucide-react';
+import { Download, RotateCcw, FileUp, ShieldCheck, Sparkles, RefreshCw, Home, FileSpreadsheet } from 'lucide-react';
 import { AppTheme } from '../types.js';
 import { OrcamentoInput, ServicoInput } from '../types/fiscal';
 import { EXEMPLO_CENARIOS } from '../data/cnaes';
@@ -15,6 +15,7 @@ interface HeaderProps {
   showThemeBar?: boolean;
   onToggleThemeBar?: () => void;
   onXmlSelected?: (file: File) => void;
+  onSpreadsheetSelected?: (file: File) => void;
 
   // Modos do sistema ('icms' | 'comparador' | 'aluguel')
   modo?: 'icms' | 'comparador' | 'aluguel';
@@ -34,17 +35,27 @@ export const Header: React.FC<HeaderProps> = ({
                                                 isExportingPdf = false,
                                                 currentTheme = 'INSTITUCIONAL',
                                                 onXmlSelected,
+                                                onSpreadsheetSelected,
                                                 modo = 'icms',
                                                 onCarregarCenario,
                                                 onLimpar,
                                                 onLimparAluguel,
                                               }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const spreadsheetInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onXmlSelected) {
       onXmlSelected(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleSpreadsheetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onSpreadsheetSelected) {
+      onSpreadsheetSelected(file);
     }
     e.target.value = '';
   };
@@ -182,6 +193,24 @@ export const Header: React.FC<HeaderProps> = ({
                       accept=".xml"
                       className="hidden"
                   />
+                  <input
+                      type="file"
+                      ref={spreadsheetInputRef}
+                      onChange={handleSpreadsheetChange}
+                      accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      className="hidden"
+                  />
+
+                  <button
+                      type="button"
+                      onClick={() => spreadsheetInputRef.current?.click()}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer border ${s.btnAction}`}
+                      title="Importar itens de uma planilha Excel"
+                  >
+                    <FileSpreadsheet className={`w-4 h-4 ${s.btnActionIcon}`} />
+                    <span className="hidden md:inline">Importar Excel</span>
+                    <span className="md:hidden">Excel</span>
+                  </button>
 
                   <button
                       type="button"
@@ -192,25 +221,6 @@ export const Header: React.FC<HeaderProps> = ({
                     <FileUp className={`w-4 h-4 ${s.btnActionIcon}`} />
                     <span className="hidden md:inline">Importar XML da NF-e</span>
                     <span className="md:hidden">XML</span>
-                  </button>
-
-                  <a
-                      href="http://app1.sefaz.mt.gov.br/sistema/legislacao/regulamentoricms.nsf"
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${s.btnNeutral}`}
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Livro 27 MT</span>
-                  </a>
-
-                  <button
-                      type="button"
-                      onClick={onPrint}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${s.btnNeutral}`}
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Imprimir</span>
                   </button>
 
                   <button

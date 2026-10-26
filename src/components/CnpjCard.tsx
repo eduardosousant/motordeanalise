@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building2, CheckCircle2, AlertTriangle, RefreshCw, Server, MapPin, Tag, SlidersHorizontal } from 'lucide-react';
+import { Search, Building2, CheckCircle2, AlertTriangle, RefreshCw, Server, MapPin, Tag, SlidersHorizontal, Pencil, X } from 'lucide-react';
 import { CnpjApiResult, AppTheme } from '../types.js';
 
 interface CnpjCardProps {
   onSupplierLoaded: (data: CnpjApiResult) => void;
+  onSimplesChange: (isOptante: boolean) => void;
   currentSupplier: CnpjApiResult | null;
+  selectedSimples: boolean;
   currentTheme?: AppTheme;
 }
 
 export type CnpjApiProvider = 'AUTO' | 'BRASIL_API' | 'OPEN_CNPJ' | 'RECEITA_WS';
 
-export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSupplier, currentTheme = 'GOV_CLASSIC' }) => {
+export const CnpjCard: React.FC<CnpjCardProps> = ({
+  onSupplierLoaded,
+  onSimplesChange,
+  currentSupplier,
+  selectedSimples,
+  currentTheme = 'GOV_CLASSIC'
+}) => {
   const [cnpjInput, setCnpjInput] = useState('60.701.190/0001-04');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<CnpjApiProvider>('AUTO');
+  const [editingSimples, setEditingSimples] = useState(false);
+  const [draftSimples, setDraftSimples] = useState(selectedSimples);
 
   const formatCnpj = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -30,6 +40,11 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
       setCnpjInput(formatCnpj(currentSupplier.cnpj));
     }
   }, [currentSupplier?.cnpj]);
+
+  useEffect(() => {
+    setDraftSimples(selectedSimples);
+    setEditingSimples(false);
+  }, [currentSupplier?.cnpj, selectedSimples]);
 
   const getThemeStyles = () => {
     switch (currentTheme) {
@@ -207,16 +222,71 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({ onSupplierLoaded, currentSup
 
                   <div>
                     <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Simples Nacional</span>
-                    <span
-                        className={`font-semibold px-2 py-0.5 rounded inline-flex items-center gap-1 mt-0.5 ${
-                            currentSupplier.optante_simples
-                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                : 'bg-teal-100 text-teal-900 border border-teal-300'
-                        }`}
-                    >
-                  <CheckCircle2 className="w-3 h-3" />
-                      {currentSupplier.optante_simples ? 'Sim (Optante LC 123/06)' : 'Não (Regime Normal / DEMAIS)'}
-                </span>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <span
+                          className={`font-semibold px-2 py-0.5 rounded inline-flex items-center gap-1 ${
+                              selectedSimples
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  : 'bg-teal-100 text-teal-900 border border-teal-300'
+                          }`}
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        {selectedSimples ? 'Sim (Optante LC 123/06)' : 'Não (Regime Normal / DEMAIS)'}
+                      </span>
+                      {!editingSimples && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftSimples(selectedSimples);
+                            setEditingSimples(true);
+                          }}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold text-teal-800 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                          aria-label="Editar opção pelo Simples Nacional"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Editar
+                        </button>
+                      )}
+                    </div>
+                    {editingSimples && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <select
+                          value={draftSimples ? 'sim' : 'nao'}
+                          onChange={(event) => setDraftSimples(event.target.value === 'sim')}
+                          aria-label="Situação do Simples Nacional"
+                          className="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
+                        >
+                          <option value="sim">Sim, optante</option>
+                          <option value="nao">Não, não optante</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSimplesChange(draftSimples);
+                            setEditingSimples(false);
+                          }}
+                          className="rounded bg-teal-700 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-teal-800 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftSimples(selectedSimples);
+                            setEditingSimples(false);
+                          }}
+                          className="inline-flex items-center gap-1 rounded border border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400/20"
+                        >
+                          <X className="h-3 w-3" />
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                    {!editingSimples && (
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        Situação preenchida pela consulta do CNPJ.
+                      </p>
+                    )}
                   </div>
 
                   <div>

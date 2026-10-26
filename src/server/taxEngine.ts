@@ -44,6 +44,7 @@ function applyOperationSupplier(
     resumo_fornecedor: {
       ...jsonResponse.resumo_fornecedor,
       cnpj: operacao.cnpj_fornecedor || jsonResponse.resumo_fornecedor.cnpj,
+      optante_simples: operacao.simples_remetente ?? jsonResponse.resumo_fornecedor.optante_simples,
       ...(operacao.razao_social_fornecedor
         ? { razao_social: operacao.razao_social_fornecedor }
         : {})

@@ -36,7 +36,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
         minute: '2-digit'
     });
 
-    const isOptanteSimples = Boolean(data.resumo_fornecedor?.optante_simples || operacao.simples_remetente);
+    const isOptanteSimples = operacao.simples_remetente ?? Boolean(data.resumo_fornecedor?.optante_simples);
     const ncmAtual = data.enquadramento_produto?.ncm || operacao.ncm || '';
     const descAtual = data.enquadramento_produto?.descricao || operacao.descricao_produto || '';
     const regimeAtual = data.enquadramento_produto?.regime_tributario_aplicavel || '';
@@ -336,7 +336,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                 <th style={{ padding: '6px 6px', textAlign: 'right', width: '72px', color: '#b45309', fontWeight: 700, whiteSpace: 'nowrap' }}>Desc. Com.</th>
                                 <th style={{ padding: '6px 6px', width: '80px', fontWeight: 700 }}>Regime MT</th>
                                 <th style={{ padding: '6px 6px', textAlign: 'right', width: '70px', fontWeight: 700, whiteSpace: 'nowrap' }}>Desc./Glosa ICMS</th>
-                                <th style={{ padding: '6px 6px', textAlign: 'right', width: '65px', fontWeight: 700, whiteSpace: 'nowrap' }}>IRRF</th>
+                                <th style={{ padding: '6px 6px', textAlign: 'right', width: '65px', fontWeight: 700, whiteSpace: 'nowrap' }}>IRRF Retido</th>
                                 <th style={{ padding: '6px 8px', textAlign: 'right', width: '75px', fontWeight: 700, whiteSpace: 'nowrap' }}>Líquido Pagar</th>
                             </tr>
                             </thead>
@@ -395,9 +395,9 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                             {abatimentoItem ? `- ${formatMoney(abatimentoItem)}` : 'R$ 0,00'}
                                         </td>
                                         <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', color: it.simulacao.valor_irrf_retido ? '#b91c1c' : '#94a3b8', fontWeight: it.simulacao.valor_irrf_retido ? 700 : 400, whiteSpace: 'nowrap' }}>
-                                            {it.simulacao.valor_irrf_calculado !== undefined
-                                                ? `${formatMoney(it.simulacao.valor_irrf_calculado)} / - ${formatMoney(it.simulacao.valor_irrf_retido || 0)}`
-                                                : (it.simulacao.valor_irrf_retido ? `- ${formatMoney(it.simulacao.valor_irrf_retido)}` : 'R$ 0,00')}
+                                            {it.simulacao.valor_irrf_retido
+                                                ? `- ${formatMoney(it.simulacao.valor_irrf_retido)}`
+                                                : 'R$ 0,00'}
                                         </td>
                                         <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#065f46', backgroundColor: '#f0fdf4', whiteSpace: 'nowrap' }}>
                                             {formatMoney(liquidoItem)}
@@ -424,8 +424,8 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                         : 'R$ 0,00'}
                                 </td>
                                 <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b91c1c', whiteSpace: 'nowrap' }}>
-                                    {consolidado.resumoConsolidado.total_irrf_calculado > 0
-                                        ? `${formatMoney(consolidado.resumoConsolidado.total_irrf_calculado)} / - ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)}`
+                                    {consolidado.resumoConsolidado.total_irrf_retido > 0
+                                        ? `- ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)}`
                                         : 'R$ 0,00'}
                                 </td>
                                 <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#065f46', backgroundColor: '#dcfce7', fontSize: '10px', whiteSpace: 'nowrap' }}>
