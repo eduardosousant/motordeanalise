@@ -34,7 +34,7 @@ export interface ResumoFornecedor {
 
 export interface CstInfo {
   codigo: string;
-  tipo: 'CST' | 'CSOSN';
+  tipo: 'CST' | 'CSOSN' | 'REGIME';
   descricao: string;
   descricaoCompleta: string;
   badgeClass: string;

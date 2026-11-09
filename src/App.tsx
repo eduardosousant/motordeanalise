@@ -19,7 +19,7 @@ import {
     HistoricoAnaliseItem,
     AnaliseConsolidadaNota
 } from './types.js';
-import { computeClientSimulation, computeConsolidatedNotaLocal } from './lib/taxCalculations.js';
+import { computeClientSimulation, computeConsolidatedNotaLocal, isCombustivelMonofasico } from './lib/taxCalculations.js';
 import { parseNfeXml } from './lib/nfeXmlParser.js';
 import { AlertCircle, FileCheck, CheckCircle2, FileText } from 'lucide-react';
 
@@ -155,6 +155,10 @@ export default function App() {
                 data = computeConsolidatedNotaLocal(targetOp);
             }
 
+            if (isCombustivelMonofasico(targetOp.ncm) || targetOp.itens?.some(item => isCombustivelMonofasico(item.ncm))) {
+                data = computeConsolidatedNotaLocal(targetOp);
+            }
+
             setResult(data);
             saveToHistory(targetOp, currentSup, data);
         } catch (err: any) {
@@ -260,8 +264,12 @@ export default function App() {
         setOperacao(prev => {
             const nextOp = { ...prev, ...updated };
             if (result?.jsonResponse) {
-                const nextSimulacao = computeClientSimulation(nextOp, result.jsonResponse);
-                setResult(rPrev => rPrev ? { ...rPrev, simulacaoCalculo: nextSimulacao } : null);
+                if (isCombustivelMonofasico(nextOp.ncm) || nextOp.itens?.some(item => isCombustivelMonofasico(item.ncm))) {
+                    setResult(computeConsolidatedNotaLocal(nextOp));
+                } else {
+                    const nextSimulacao = computeClientSimulation(nextOp, result.jsonResponse);
+                    setResult(rPrev => rPrev ? { ...rPrev, simulacaoCalculo: nextSimulacao } : null);
+                }
             }
             return nextOp;
         });
