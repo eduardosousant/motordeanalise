@@ -114,7 +114,8 @@ export default function App() {
                 !(item.operacao.ncm === targetOp.ncm &&
                     item.operacao.cnpj_fornecedor === targetOp.cnpj_fornecedor &&
                     item.operacao.valor_operacao === targetOp.valor_operacao &&
-                    item.operacao.finalidade_compra === targetOp.finalidade_compra &&
+                item.operacao.simples_remetente === targetOp.simples_remetente &&
+                item.operacao.finalidade_compra === targetOp.finalidade_compra &&
                     item.operacao.tipo_adquirente === targetOp.tipo_adquirente)
             );
             const updated = [newItem, ...filtered].slice(0, 5);
@@ -244,6 +245,15 @@ export default function App() {
         }));
     };
 
+    const handleSimplesChange = (isOptante: boolean) => {
+        const nextOperacao = { ...operacao, simples_remetente: isOptante };
+        const nextSupplier = supplierData ? { ...supplierData, optante_simples: isOptante } : null;
+        setOperacao(nextOperacao);
+        setSupplierData(nextSupplier);
+        setResult(null);
+        runAnalysis(nextOperacao, nextSupplier);
+    };
+
     const handleSelectExemplo = (op: OperacaoComercial) => {
         setOperacao(op);
         const newSup: CnpjApiResult = {
@@ -368,7 +378,9 @@ export default function App() {
                             <div className="flex flex-col gap-6">
                                 <CnpjCard
                                     onSupplierLoaded={handleSupplierLoaded}
+                                    onSimplesChange={handleSimplesChange}
                                     currentSupplier={supplierData}
+                                    selectedSimples={Boolean(operacao.simples_remetente)}
                                     currentTheme={theme}
                                 />
 
@@ -407,6 +419,7 @@ export default function App() {
                                     <AnalysisResultView
                                         data={result.jsonResponse}
                                         simulacao={result.simulacaoCalculo}
+                                        optanteSimples={operacao.simples_remetente}
                                         fonteAnalise={result.fonteAnalise}
                                         currentTheme={theme}
                                         consolidado={result.consolidado}
