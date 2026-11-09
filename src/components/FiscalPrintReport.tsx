@@ -5,7 +5,7 @@ import {
     OperacaoComercial,
     AnaliseConsolidadaNota
 } from '../types.js';
-import { getCstInfo, checkProductSt } from '../lib/taxCalculations.js';
+import { getCstInfo, checkProductSt, isCombustivelMonofasico } from '../lib/taxCalculations.js';
 import { formatarCNPJ } from '../utils/formatters.js';
 
 interface FiscalPrintReportProps {
@@ -40,13 +40,17 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
     const ncmAtual = data.enquadramento_produto?.ncm || operacao.ncm || '';
     const descAtual = data.enquadramento_produto?.descricao || operacao.descricao_produto || '';
     const regimeAtual = data.enquadramento_produto?.regime_tributario_aplicavel || '';
-    const isSt = regimeAtual.includes('Substituição') || checkProductSt(ncmAtual, descAtual);
+    const isCombustivelMono = isCombustivelMonofasico(ncmAtual);
+    const temCombustivelMonofasico = Boolean(consolidado?.itensAnalise.some(it => isCombustivelMonofasico(it.item.ncm)));
+    const isSt = !isCombustivelMono && (regimeAtual.includes('Substituição') || checkProductSt(ncmAtual, descAtual));
 
     const isGlosa = Boolean(simulacao.is_glosa_administrativa || (consolidado && consolidado.resumoConsolidado.total_glosa_icms > 0));
     const valorGlosa = simulacao.valor_glosa_icms || (consolidado ? consolidado.resumoConsolidado.total_glosa_icms : 0);
 
-    // Se houver direito à isenção ou glosa administrativa, o parecer SEMPRE indica CST 40
-    const cstCalculado = (isGlosa || (simulacao.desconto_isencao_orgao_publico && simulacao.desconto_isencao_orgao_publico > 0))
+    // Itens monofásicos não recebem CST 40 nem sugestão de CST nesta análise.
+    const cstCalculado = (isCombustivelMono && !temMultiplosItens)
+        ? getCstInfo(data, simulacao, isOptanteSimples, ncmAtual)
+        : (isGlosa || (simulacao.desconto_isencao_orgao_publico && simulacao.desconto_isencao_orgao_publico > 0))
         ? {
             codigo: '40',
             tipo: 'CST' as const,
@@ -59,9 +63,11 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
     const valorBrutoTotal = simulacao.base_calculo_origem + (simulacao.valor_desconto_comercial || 0);
 
     // Texto de instrução e enquadramento formatado de forma dinâmica para Multi-Itens ou Item Único
-    const textoOrientacaoConsolidado = temMultiplosItens && consolidado
+    const textoOrientacaoConsolidado = isCombustivelMono && !temMultiplosItens
+        ? `TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS: O NCM ${ncmAtual} enquadra o item no grupo monofásico. Não utilizar CST 40 nem aplicar desconto de ICMS desonerado do Art. 65. O faturamento deve ocorrer pelo VALOR INTEGRAL da proposta; esta análise não sugere um CST específico.`
+        : temMultiplosItens && consolidado
         ? (isOptanteSimples
-            ? `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 102/500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`
+            ? `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL${temCombustivelMonofasico ? '' : ' (CSOSN 102/500)'}: A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica.${temCombustivelMonofasico ? ' Combustíveis monofásicos não recebem CST 40 nem desconto do Art. 65, sem sugestão de CST.' : ''} 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`
             : `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) Operação com ${consolidado.itensAnalise.length} itens.${isGlosa ? ' Identificada GLOSA ADMINISTRATIVA em itens sem desoneração formal. Conforme Art. 2º, § 10 da IN RFB nº 1.234/2012, a retenção de IRRF incide sobre o valor original da nota.' : ''} 2) Retenção na fonte de IRRF apurada ITEM A ITEM, totalizando ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)} no pagamento.`)
         : isGlosa
             ? `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & Conv. 73/04): 1) REGIME NORMAL (CST 40): Isenção de ICMS obrigatória não destacada formalmente na NF-e. Glosa administrativa de 17% aplicada no pagamento. 2) Instrução Normativa RFB nº 1.234/2012, Art. 2º, § 10: “§ 10. Em caso de pagamentos com glosa de valores constantes da nota fiscal, sem emissão de nova nota fiscal, a retenção deverá incidir sobre o valor original da nota.” Retenção de 1,20% sobre ${formatMoney(simulacao.base_calculo_irrf_efetiva || simulacao.base_calculo_origem)}.`
@@ -73,7 +79,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
             {
                 artigo_anexo: "Orientação Técnica nº 03/2026 CGE-MT & RICMS/MT",
                 dispositivo: "Decreto nº 2.212/2014-MT",
-                resumo_regra: `Operação com ${consolidado.itensAnalise.length} itens: produtos enquadrados no Anexo X (ST) são faturados integralmente (CST 60) e itens fora da ST exigem abatimento de 17% a título de ICMS desonerado (CST 40) ou aplicação de glosa administrativa.`
+                resumo_regra: `Operação com ${consolidado.itensAnalise.length} itens: o enquadramento fiscal é feito item a item. Combustíveis monofásicos e produtos em ST são faturados sem desconto do Art. 65; a isenção ou glosa de ICMS só se aplica aos demais itens quando cabível.`
             },
             {
                 artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
@@ -343,7 +349,8 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                             <tbody>
                             {consolidado.itensAnalise.map((it, idx) => {
                                 const itemIsGlosa = Boolean(it.simulacao.is_glosa_administrativa);
-                                const cstInfo = (itemIsGlosa || (it.simulacao.desconto_isencao_orgao_publico && it.simulacao.desconto_isencao_orgao_publico > 0))
+                                const isItemMonofasico = isCombustivelMonofasico(it.item.ncm);
+                                const cstInfo = (!isItemMonofasico && (itemIsGlosa || (it.simulacao.desconto_isencao_orgao_publico && it.simulacao.desconto_isencao_orgao_publico > 0)))
                                     ? {
                                         codigo: '40',
                                         tipo: 'CST' as const,
@@ -352,6 +359,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                         badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
                                     }
                                     : getCstInfo(it.jsonResponse, it.simulacao, isOptanteSimples);
+                                const cstCodigoExibido = isItemMonofasico && it.item.cst ? String(it.item.cst).trim() : cstInfo.codigo;
 
                                 const valorBrutoItem = (it.item.quantidade || 1) * (it.item.valor_unitario || 0);
                                 const liquidoItem = it.simulacao.valor_liquido_pagamento_fornecedor !== undefined
@@ -374,7 +382,13 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                             {it.item.ncm}
                                         </td>
                                         <td style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, fontSize: '9px', color: '#0f172a', whiteSpace: 'nowrap' }}>
-                                            {cstInfo.codigo}
+                                            {cstCodigoExibido}
+                                            {isItemMonofasico && String(it.item.cst || '').trim() === '40' && (
+                                                <span style={{ display: 'block', fontFamily: 'sans-serif', fontSize: '7px', color: '#b91c1c' }}>CST 40 informado: revisar</span>
+                                            )}
+                                            {isItemMonofasico && Number(it.item.valor_icms_desonerado) > 0 && (
+                                                <span style={{ display: 'block', fontFamily: 'sans-serif', fontSize: '7px', color: '#b91c1c' }}>ICMS desonerado informado: revisar</span>
+                                            )}
                                         </td>
                                         <td style={{ padding: '5px 8px', fontWeight: 500, color: '#0f172a', lineHeight: 1.25 }}>
                                             {it.item.descricao}
@@ -782,7 +796,7 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                         }}
                                     >
                                         <span>Isenção de ICMS no Preço:</span>
-                                        <span>Inaplicável (Sem Dedução - {isOptanteSimples ? 'Simples Nacional' : 'Item sob ST'})</span>
+                                        <span>Inaplicável (Sem Dedução - {isCombustivelMono ? 'Combustível monofásico' : isOptanteSimples ? 'Simples Nacional' : 'Item sob ST'})</span>
                                     </div>
                                 )}
 

@@ -21,7 +21,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { AnaliseTributariaJSON, SimulacaoMemoriaCalculo, AppTheme, AnaliseConsolidadaNota } from '../types.js';
-import { getCstInfo } from '../lib/taxCalculations.js';
+import { getCstInfo, isCombustivelMonofasico } from '../lib/taxCalculations.js';
 
 interface AnalysisResultViewProps {
   data: AnaliseTributariaJSON;
@@ -41,9 +41,13 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
   const [activeTab, setActiveTab] = useState<'EXECUTIVA' | 'GRADE_ITENS' | 'LEGAL' | 'CALCULO' | 'DEBUG'>('EXECUTIVA');
   const [copied, setCopied] = useState(false);
   const temMultiplosItens = Boolean(consolidado && consolidado.itensAnalise && consolidado.itensAnalise.length > 1);
+  const isCombustivelMono = isCombustivelMonofasico(data.enquadramento_produto.ncm);
+  const orientacaoFiscal = isCombustivelMono && !temMultiplosItens
+      ? `TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS: O NCM ${data.enquadramento_produto.ncm} enquadra o item no grupo monofásico. Não utilizar CST 40 nem aplicar desconto de ICMS desonerado do Art. 65. O faturamento deve ocorrer pelo VALOR INTEGRAL da proposta; esta análise não sugere um CST específico.`
+      : data.orientacao_fiscal;
 
-  // Se a mercadoria tiver direito à isenção (ou estiver sob Glosa Administrativa), o parecer técnico SEMPRE sugere CST 40
-  const cstInfoSingle = (simulacao.is_glosa_administrativa || (simulacao.desconto_isencao_orgao_publico && simulacao.desconto_isencao_orgao_publico > 0))
+  // Itens monofásicos não recebem CST 40 nem sugestão de CST nesta análise.
+  const cstInfoSingle = (!isCombustivelMono && (simulacao.is_glosa_administrativa || (simulacao.desconto_isencao_orgao_publico && simulacao.desconto_isencao_orgao_publico > 0)))
       ? {
         codigo: '40',
         tipo: 'CST' as const,
@@ -327,7 +331,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                   <div>
                     <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Orientação Consultiva & Lançamento MT</h4>
                     <p className="text-xs text-amber-950 mt-1 leading-relaxed">
-                      {formatOrientacaoFiscal(data.orientacao_fiscal)}
+                      {formatOrientacaoFiscal(orientacaoFiscal)}
                     </p>
                   </div>
                 </div>
@@ -483,7 +487,8 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                         const item = itemAnalise.item;
                         const sim = itemAnalise.simulacao;
                         const resp = itemAnalise.jsonResponse;
-                        const cstInfo = (sim.is_glosa_administrativa || (sim.desconto_isencao_orgao_publico && sim.desconto_isencao_orgao_publico > 0))
+                        const isItemMonofasico = isCombustivelMonofasico(item.ncm);
+                        const cstInfo = (!isItemMonofasico && (sim.is_glosa_administrativa || (sim.desconto_isencao_orgao_publico && sim.desconto_isencao_orgao_publico > 0)))
                             ? {
                               codigo: '40',
                               tipo: 'CST' as const,
@@ -492,6 +497,8 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                               badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
                             }
                             : getCstInfo(resp, sim, data.resumo_fornecedor?.optante_simples);
+                        const cstCodigoExibido = isItemMonofasico && item.cst ? String(item.cst).trim() : cstInfo.codigo;
+                        const cstDescricaoExibida = isItemMonofasico && item.cst ? 'CST informado na NF-e' : cstInfo.descricao;
 
                         const valorBrutoItem = (item.quantidade || 1) * (item.valor_unitario || 0);
                         const liquidoItem = sim.valor_liquido_pagamento_fornecedor !== undefined
@@ -513,14 +520,20 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                                   className={`inline-block font-mono font-bold text-[11px] px-2 py-0.5 rounded border shadow-2xs ${cstInfo.badgeClass}`}
                                   title={cstInfo.descricaoCompleta}
                               >
-                                {cstInfo.codigo}
+                                {cstCodigoExibido}
                               </span>
                                   <span
                                       className="text-[9px] text-slate-500 font-medium block truncate max-w-[100px] mt-0.5"
-                                      title={cstInfo.descricao}
+                                      title={cstDescricaoExibida}
                                   >
-                                {cstInfo.descricao}
+                                {cstDescricaoExibida}
                               </span>
+                                  {isItemMonofasico && String(item.cst || '').trim() === '40' && (
+                                      <span className="text-[9px] text-red-700 font-bold block mt-0.5">CST 40 informado na NF-e: revisar</span>
+                                  )}
+                                  {isItemMonofasico && Number(item.valor_icms_desonerado) > 0 && (
+                                      <span className="text-[9px] text-red-700 font-bold block mt-0.5">ICMS desonerado informado: revisar</span>
+                                  )}
                                 </div>
                               </td>
                               <td className="py-3 px-4">
@@ -737,7 +750,14 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                   )}
 
                   {/* Bloco de Compras Públicas: Diferenciação entre Glosa, Isenção Formal e ST/Simples */}
-                  {simulacao.is_glosa_administrativa ? (
+                  {isCombustivelMono && !temMultiplosItens ? (
+                      <div className="bg-sky-50 border border-sky-200 p-3.5 rounded text-sky-950 space-y-1.5 my-2 font-sans">
+                        <div className="font-bold text-sky-900 font-mono text-xs">TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS</div>
+                        <p className="text-[11px] text-sky-900/90 leading-relaxed">
+                          O NCM do item pertence ao grupo de combustíveis monofásicos. Não utilizar CST 40 nem aplicar desconto do ICMS desonerado do Art. 65. Faturar pelo valor integral da proposta; esta análise não sugere um CST específico.
+                        </p>
+                      </div>
+                  ) : simulacao.is_glosa_administrativa ? (
                       <div className="bg-amber-50 border border-amber-300 p-3.5 rounded text-amber-950 space-y-1.5 my-2 font-sans">
                         <div className="flex justify-between font-bold text-amber-900 font-mono text-xs">
                           <span>🏛️ COMPRA PÚBLICA ESTADUAL — GLOSA ADMINISTRATIVA (IN RFB nº 1.234/2012):</span>

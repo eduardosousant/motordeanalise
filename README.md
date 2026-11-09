@@ -11,6 +11,7 @@ Sistema especialista em análise tributária, equalização de orçamentos e aud
 - **Compras Públicas (OT CGE-MT nº 03/2026)**:
   - **Simples Nacional**: Reconhece que optantes pelo Simples faturam pelo valor integral sem desconto de isenção estadual de ICMS (LC 123/2006).
   - **Regime Normal**: Exige a isenção compulsória com destaque no campo `vICMSDeson` (17% interno MT) para itens fora de ST e veda a isenção para itens com Substituição Tributária (Art. 65, § 3º, Anexo IV).
+  - **Combustíveis Monofásicos**: Itens com NCM `2711.19.10`, `2711.11.00`, `2710.12.59`, `2710.19.21`, `2710.19.22`, `3826.00.00`, `2207.10.90` ou `2207.20.10` são classificados como monofásicos; não se aplica CST 40 nem desconto do ICMS desonerado do Art. 65, e o faturamento ocorre pelo valor integral da proposta. A regra não sugere um CST específico.
   - **Retenções de IRRF (IN RFB 1.234/2012)**: Cálculo por código de retenção (0,24%, 1,20%, 2,40%, 4,80%), com dispensa para Simples Nacional e dispensa operacional para valores inferiores a R$ 10,00.
 - **Importação Direta de XML de NF-e**: Leitura automática de produtos, CST, CSOSN, NCM, desoneração e impostos para auditoria imediata.
 - **Múltiplos Itens por Nota Fiscal**: Suporte à adição em lote com consolidação e cálculo item a item.

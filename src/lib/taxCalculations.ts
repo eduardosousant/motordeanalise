@@ -27,6 +27,20 @@ export function multiplicarETruncar(num1: number, num2: number, casas: number = 
 }
 
 const VALOR_MINIMO_RETENCAO_IRRF = 10;
+const NCM_COMBUSTIVEIS_MONOFASICOS = new Set([
+  '27111910',
+  '27111100',
+  '27101259',
+  '27101921',
+  '27101922',
+  '38260000',
+  '22071090',
+  '22072010'
+]);
+
+export function isCombustivelMonofasico(ncm: string): boolean {
+  return NCM_COMBUSTIVEIS_MONOFASICOS.has((ncm || '').replace(/\D/g, ''));
+}
 
 function obterValorRetidoIRRF(valorCalculado: number): number {
   return valorCalculado >= VALOR_MINIMO_RETENCAO_IRRF ? valorCalculado : 0;
@@ -75,6 +89,7 @@ export function calcularEnquadramentoItem(
   descIsencao: number;
   valorGlosaIcms: number;
   isGlosaAdministrativa: boolean;
+  isMonofasico: boolean;
   baseCalculoIrrf: number;
   irrf: number;
   liquidoItem: number;
@@ -85,6 +100,7 @@ export function calcularEnquadramentoItem(
 } {
   const dadosNcm = consultarNcmOficialMT(item.ncm, item.descricao);
   const isST = dadosNcm.isSt;
+  const isMonofasico = isCombustivelMonofasico(item.ncm);
   const valorTotal = truncar(Number(item.valorTotal) || 0, 2);
 
   let cst = '00';
@@ -100,8 +116,21 @@ export function calcularEnquadramentoItem(
   const aliquotaIrrfDecimal = aliquotaIrrfPercentual / 100;
   const isOrgaoPublicoMT = (adquirente.tipo === 'ORGAO_PUBLICO_ESTADUAL');
 
+  // Combustíveis monofásicos não recebem o desconto de ICMS do Art. 65.
+  if (isMonofasico) {
+    regimeMt = 'Tributação Monofásica sobre Combustíveis';
+    cst = '';
+    descIsencao = 0.00;
+    valorGlosaIcms = 0.00;
+    isGlosaAdministrativa = false;
+    baseCalculoIrrf = valorTotal;
+    irrf = fornecedor.isSimplesNacional || !isOrgaoPublicoMT
+        ? 0.00
+        : multiplicarETruncar(baseCalculoIrrf, aliquotaIrrfDecimal, 2);
+    aliquotaIcmsDestacada = 0.00;
+  }
   // 1. Fornecedor do SIMPLES NACIONAL (CRT 1)
-  if (fornecedor.isSimplesNacional) {
+  else if (fornecedor.isSimplesNacional) {
     if (!isST) {
       cst = '102';
       regimeMt = 'Tributação Normal Simples';
@@ -182,6 +211,7 @@ export function calcularEnquadramentoItem(
     descIsencao,
     valorGlosaIcms,
     isGlosaAdministrativa,
+    isMonofasico,
     baseCalculoIrrf,
     irrf,
     liquidoItem,
@@ -353,18 +383,33 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
 
   const aliqMT = "17%";
 
-  let mvaPauta = enq.isST
+  let mvaPauta = enq.isMonofasico
+      ? 'Tributação Monofásica sobre Combustíveis'
+      : enq.isST
       ? "Substituição Tributária (Anexo X MT)"
       : (enq.cst === '40' ? "Isento c/ Desconto Obrigatório no Preço (Conv. 73/04)" : "Tributação Normal MT");
 
-  if (isSimples) {
+  if (isSimples && !enq.isMonofasico) {
     mvaPauta = enq.isST ? "CSOSN 500 (ST Antecipada)" : "CSOSN 102 (Valor Integral da Proposta)";
   }
 
   const fundamentacao: { artigo_anexo: string; dispositivo: string; resumo_regra: string }[] = [];
   const irrfClass = getIrrfClassification(op.ncm, op.descricao_produto);
 
-  if (isOrgaoPublico) {
+  if (enq.isMonofasico) {
+    fundamentacao.push({
+      artigo_anexo: "Tributação monofásica de combustíveis",
+      dispositivo: "Enquadramento pelo NCM do produto",
+      resumo_regra: "O NCM do item pertence ao grupo de combustíveis monofásicos. Não aplicar CST 40 nem desconto do ICMS desonerado do Art. 65; faturar pelo valor integral da proposta. Esta regra não define um CST específico."
+    });
+    if (isOrgaoPublico && !isSimples) {
+      fundamentacao.push({
+        artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
+        dispositivo: `Instrução Normativa RFB nº 1.234/2012 (Anexo I - Código ${irrfClass.codigoRfb})`,
+        resumo_regra: `Retenção na fonte de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) sobre o valor integral faturado.`
+      });
+    }
+  } else if (isOrgaoPublico) {
     if (isSimples) {
       fundamentacao.push({
         artigo_anexo: "Orientação Técnica nº 03/2026 - CGE/MT & LC 123/2006",
@@ -427,7 +472,9 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
   }
 
   let orientacao = "";
-  if (isOrgaoPublico) {
+  if (enq.isMonofasico) {
+    orientacao = `TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS: O NCM ${op.ncm} enquadra o item no grupo monofásico. Não utilizar CST 40 nem aplicar desconto de ICMS desonerado do Art. 65. O faturamento deve ocorrer pelo VALOR INTEGRAL da proposta; esta análise não sugere um CST específico.${isOrgaoPublico && !isSimples ? ` Retenção de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% sobre o valor integral faturado.` : isSimples ? ' A dispensa de IRRF do Simples Nacional permanece aplicável.' : ''}`;
+  } else if (isOrgaoPublico) {
     if (isSimples) {
       orientacao = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (${enq.cst === '500' ? 'CSOSN 500' : 'CSOSN 102'}): A isenção de ICMS NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB 1.234/2012).`;
     } else if (enq.isST) {
@@ -453,7 +500,7 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
       ncm: op.ncm,
       descricao: op.descricao_produto,
       regime_tributario_aplicavel: enq.regimeMt,
-      cst_codigo: enq.cst
+      ...(enq.cst ? { cst_codigo: enq.cst } : {})
     },
     aliquotas: {
       aliquota_origem: aliqOrigem,
@@ -625,7 +672,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       enquadramento_produto: {
         ...det.jsonResponse.enquadramento_produto,
         regime_tributario_aplicavel: enq.regimeMt,
-        cst_codigo: enq.cst
+        ...(enq.cst ? { cst_codigo: enq.cst } : {})
       }
     };
 
@@ -645,17 +692,22 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
 
   const temMultiplosItens = itensAnalise.length > 1;
   const temAlgumaGlosa = itensAnalise.some(i => i.simulacao.is_glosa_administrativa);
+  const temCombustivelMonofasico = itensAnalise.some(i => isCombustivelMonofasico(i.item.ncm));
 
   let orientacaoConsolidada = "";
 
-  if (isSimples) {
-    orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 102/500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica. 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`;
+  if (!temMultiplosItens && temCombustivelMonofasico) {
+    orientacaoConsolidada = primeiro.jsonResponse.orientacao_fiscal;
+  } else if (isSimples) {
+    orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL${temCombustivelMonofasico ? '' : ' (CSOSN 102/500)'}: A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica.${temCombustivelMonofasico ? ' Os itens com NCM do grupo de combustíveis são classificados como monofásicos, sem sugestão de CST, sem CST 40 e sem desconto do Art. 65.' : ''} 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`;
   } else if (temMultiplosItens) {
-    orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) Operação com ${itensAnalise.length} itens.${temAlgumaGlosa ? ` Identificada GLOSA ADMINISTRATIVA em itens sem desoneração formal (Art. 2º, § 10 da IN 1.234/12), onde a retenção de IRRF incide sobre o valor original.` : ''} 2) Retenção na fonte de IRRF apurada ITEM A ITEM conforme Anexo I da IN RFB nº 1.234/2012 (incluindo 0,24% para combustíveis/GLP e 1,20% para mercadorias), totalizando a retenção de ${resumo.total_irrf_retido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no pagamento ao fornecedor.`;
+    orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (IN RFB nº 1.234/2012 & OT CGE-MT nº 03/2026): 1) Operação com ${itensAnalise.length} itens; o enquadramento e os abatimentos são avaliados item a item.${temCombustivelMonofasico ? ' Itens com NCM do grupo de combustíveis monofásicos devem ser faturados pelo valor integral, sem CST 40 ou desconto do Art. 65.' : ''}${temAlgumaGlosa ? ' Identificada GLOSA ADMINISTRATIVA em itens sem desoneração formal (Art. 2º, § 10 da IN 1.234/12), onde a retenção de IRRF incide sobre o valor original.' : ''} 2) Retenção na fonte de IRRF apurada ITEM A ITEM conforme Anexo I da IN RFB nº 1.234/2012 (incluindo 0,24% para combustíveis/GLP e 1,20% para mercadorias), totalizando a retenção de ${resumo.total_irrf_retido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no pagamento ao fornecedor.`;
   } else {
     const aliqUnica = itensAnalise[0]?.simulacao.aliquota_irrf_in1234 || 1.20;
     const isStUnico = itensAnalise[0]?.jsonResponse.enquadramento_produto.regime_tributario_aplicavel?.includes('Substituição');
-    if (isStUnico) {
+    if (isCombustivelMonofasico(primeiro.item.ncm)) {
+      orientacaoConsolidada = primeiro.jsonResponse.orientacao_fiscal;
+    } else if (isStUnico) {
       orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não se aplica a mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de ${aliqUnica.toFixed(2)}% no pagamento ao fornecedor.`;
     } else if (primeiro.simulacao.is_glosa_administrativa) {
       orientacaoConsolidada = `ALERTA DE GLOSA ADMINISTRATIVA (Art. 2º, § 10 da IN RFB 1.234/2012): A NF-e não trouxe o ICMS desonerado formal. Glosa financeira de R$ ${resumo.total_glosa_icms.toFixed(2)} aplicada no pagamento. A retenção de IRRF (${aliqUnica}%) incide obrigatoriamente sobre o valor original da nota.`;
@@ -669,7 +721,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
         {
           artigo_anexo: "Orientação Técnica nº 03/2026 CGE-MT & RICMS/MT",
           dispositivo: "Decreto nº 2.212/2014-MT",
-          resumo_regra: `Operação com ${itensAnalise.length} itens: produtos enquadrados no Anexo X (ST) são faturados integralmente (CST 60) e itens fora da ST exigem abatimento de 17% a título de ICMS desonerado (CST 40) ou glosa administrativa.`
+          resumo_regra: `Operação com ${itensAnalise.length} itens: o enquadramento fiscal é feito item a item. Combustíveis monofásicos e produtos em ST são faturados sem desconto do Art. 65; a isenção ou glosa de ICMS só se aplica aos demais itens quando cabível.`
         },
         {
           artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
@@ -721,7 +773,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
 
 export interface CstInfo {
   codigo: string;
-  tipo: 'CST' | 'CSOSN';
+  tipo: 'CST' | 'CSOSN' | 'REGIME';
   descricao: string;
   descricaoCompleta: string;
   badgeClass: string;
@@ -733,6 +785,18 @@ export function getCstInfo(
     optanteSimples?: boolean,
     ncm?: string
 ): CstInfo {
+  const ncmAtual = ncm || jsonResponse?.enquadramento_produto?.ncm || '';
+  const regimeAtual = jsonResponse?.enquadramento_produto?.regime_tributario_aplicavel || '';
+  if (isCombustivelMonofasico(ncmAtual) || regimeAtual.includes('Monofásica')) {
+    return {
+      codigo: '—',
+      tipo: 'REGIME',
+      descricao: 'Tributação monofásica',
+      descricaoCompleta: 'Combustível classificado como monofásico pelo NCM. A regra não define um CST específico; não aplicar CST 40 nem desconto do Art. 65.',
+      badgeClass: 'bg-sky-100 text-sky-900 border-sky-300'
+    };
+  }
+
   const isSimples = optanteSimples !== undefined ? optanteSimples : Boolean(jsonResponse?.resumo_fornecedor?.optante_simples);
   const cstFromEngine = jsonResponse?.enquadramento_produto?.cst_codigo;
 
@@ -784,7 +848,6 @@ export function getCstInfo(
     }
   }
 
-  const ncmAtual = ncm || jsonResponse?.enquadramento_produto?.ncm || '';
   const isSt = verificarNcmNoAnexoX(ncmAtual);
 
   if (isSimples) {

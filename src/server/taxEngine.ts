@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { OperacaoComercial, AnaliseTributariaJSON, SimulacaoMemoriaCalculo } from '../types.js';
 import { consultarNcmOficialMT, verificarNcmNoAnexoX } from '../data/ncmDatabase.js';
-import { calcularEnquadramentoItem, getIrrfClassification } from '../lib/taxCalculations.js';
+import { calcularEnquadramentoItem, getIrrfClassification, isCombustivelMonofasico } from '../lib/taxCalculations.js';
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -142,7 +142,9 @@ export async function processTaxAnalysis(operacao: OperacaoComercial): Promise<{
     const cachedEntry = cacheMap[cacheKey];
     console.info(`[TAX ENGINE CACHE HIT] Análise recuperada da base local para NCM ${operacao.ncm} (${cacheKey}). Sem consumo de API/Cota.`);
 
-    const jsonResponse = applyOperationSupplier(cachedEntry.jsonResponse, operacao);
+    const jsonResponse = isCombustivelMonofasico(operacao.ncm)
+        ? computeDeterministicAnalysis(operacao).jsonResponse
+        : applyOperationSupplier(cachedEntry.jsonResponse, operacao);
     const simulacao = computeSimulation(operacao, jsonResponse);
 
     return {
@@ -315,7 +317,9 @@ FORMATO ESTRITO DE RESPOSTA JSON EXIGIDO:
       }
 
       if (parsedJson) {
-        parsedJson = applyOperationSupplier(parsedJson, operacao);
+        parsedJson = isCombustivelMonofasico(operacao.ncm)
+            ? computeDeterministicAnalysis(operacao).jsonResponse
+            : applyOperationSupplier(parsedJson, operacao);
         cacheMap[cacheKey] = {
           cacheKey,
           createdAt: new Date().toISOString(),
@@ -538,15 +542,30 @@ function computeDeterministicAnalysis(op: OperacaoComercial): {
   }
 
   const aliqMT = "17%";
-  let mvaPauta = enq.isST ? "Substituição Tributária (Anexo X MT)" : (enq.cst === '40' ? "Isento c/ Desconto Obrigatório no Preço (Conv. 73/04)" : "Tributação Normal MT");
-  if (isSimples) {
+  let mvaPauta = enq.isMonofasico
+      ? "Tributação Monofásica sobre Combustíveis"
+      : enq.isST ? "Substituição Tributária (Anexo X MT)" : (enq.cst === '40' ? "Isento c/ Desconto Obrigatório no Preço (Conv. 73/04)" : "Tributação Normal MT");
+  if (isSimples && !enq.isMonofasico) {
     mvaPauta = enq.isST ? "CSOSN 500 (ST Antecipada)" : "CSOSN 102 (Valor Integral da Proposta)";
   }
 
   const fundamentacao: { artigo_anexo: string; dispositivo: string; resumo_regra: string }[] = [];
   const irrfClass = getIrrfClassification(op.ncm, op.descricao_produto);
 
-  if (isOrgaoPublico) {
+  if (enq.isMonofasico) {
+    fundamentacao.push({
+      artigo_anexo: "Tributação monofásica de combustíveis",
+      dispositivo: "Enquadramento pelo NCM do produto",
+      resumo_regra: "O NCM do item pertence ao grupo de combustíveis monofásicos. Não aplicar CST 40 nem desconto do ICMS desonerado do Art. 65; faturar pelo valor integral da proposta. Esta regra não define um CST específico."
+    });
+    if (isOrgaoPublico && !isSimples) {
+      fundamentacao.push({
+        artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
+        dispositivo: `Instrução Normativa RFB nº 1.234/2012 (Anexo I - Código ${irrfClass.codigoRfb})`,
+        resumo_regra: `Retenção na fonte obrigatória de IRRF no percentual de ${enq.aliquotaIrrf.toFixed(2)}% (${irrfClass.categoria}) sobre o valor integral faturado.`
+      });
+    }
+  } else if (isOrgaoPublico) {
     if (isSimples) {
       fundamentacao.push({
         artigo_anexo: "Orientação Técnica nº 03/2026 - CGE/MT & LC 123/2006",
@@ -598,7 +617,9 @@ function computeDeterministicAnalysis(op: OperacaoComercial): {
   }
 
   let orientacao = "";
-  if (isOrgaoPublico) {
+  if (enq.isMonofasico) {
+    orientacao = `TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS: O NCM ${op.ncm} enquadra o item no grupo monofásico. Não utilizar CST 40 nem aplicar desconto de ICMS desonerado do Art. 65. O faturamento deve ocorrer pelo VALOR INTEGRAL da proposta; esta análise não sugere um CST específico.${isOrgaoPublico && !isSimples ? ` Retenção de IRRF de ${enq.aliquotaIrrf.toFixed(2)}% sobre o valor integral faturado.` : isSimples ? ' A dispensa de IRRF do Simples Nacional permanece aplicável.' : ''}`;
+  } else if (isOrgaoPublico) {
     if (isSimples) {
       orientacao = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (${enq.cst === '500' ? 'CSOSN 500' : 'CSOSN 102'}): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica ao Simples Nacional. 2) A Nota Fiscal apresentada deve ser emitida pelo VALOR INTEGRAL da proposta, sem desconto de ICMS. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`;
     } else if (enq.isST) {
@@ -622,7 +643,7 @@ function computeDeterministicAnalysis(op: OperacaoComercial): {
       ncm: op.ncm,
       descricao: op.descricao_produto,
       regime_tributario_aplicavel: enq.regimeMt,
-      cst_codigo: enq.cst
+      ...(enq.cst ? { cst_codigo: enq.cst } : {})
     },
     aliquotas: {
       aliquota_origem: aliqOrigem,
