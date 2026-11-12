@@ -187,22 +187,12 @@ export const Header: React.FC<HeaderProps> = ({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer border ${s.btnAction}`}
-                      title="Importar XML da Nota Fiscal Eletrônica"
+                      title="Importar XML da NFe"
                   >
                     <FileUp className={`w-4 h-4 ${s.btnActionIcon}`} />
-                    <span className="hidden md:inline">Importar XML da NF-e</span>
+                    <span className="hidden md:inline">XML da NF-e</span>
                     <span className="md:hidden">XML</span>
                   </button>
-
-                  <a
-                      href="http://app1.sefaz.mt.gov.br/sistema/legislacao/regulamentoricms.nsf"
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${s.btnNeutral}`}
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Livro 27 MT</span>
-                  </a>
 
                   <button
                       type="button"
