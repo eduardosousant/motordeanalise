@@ -10,6 +10,7 @@ import { FiscalPrintReport } from './components/FiscalPrintReport.tsx';
 import { Sidebar, ActiveModule } from './components/Sidebar.tsx';
 import { AluguelModule } from './components/AluguelModule.tsx';
 import { ComparadorOrcamentosSection } from './components/ComparadorOrcamentosSection.tsx';
+import { SpreadsheetImportReviewModal } from './components/SpreadsheetImportReviewModal.tsx';
 import {
     OperacaoComercial,
     AnaliseTributariaJSON,
@@ -17,7 +18,8 @@ import {
     CnpjApiResult,
     AppTheme,
     HistoricoAnaliseItem,
-    AnaliseConsolidadaNota
+    AnaliseConsolidadaNota,
+    ItemNotaFiscal
 } from './types.js';
 import { computeClientSimulation, computeConsolidatedNotaLocal, isCombustivelMonofasico } from './lib/taxCalculations.js';
 import { parseNfeXml } from './lib/nfeXmlParser.js';
@@ -65,6 +67,8 @@ export default function App() {
     const [theme, setTheme] = useState<AppTheme>('INSTITUCIONAL');
     const [showThemeBar, setShowThemeBar] = useState(false);
     const [xmlSuccessMsg, setXmlSuccessMsg] = useState<string | null>(null);
+    const [spreadsheetImport, setSpreadsheetImport] = useState<{ fileName: string; items: ItemNotaFiscal[] } | null>(null);
+    const [spreadsheetError, setSpreadsheetError] = useState<string | null>(null);
 
     const [result, setResult] = useState<{
         jsonResponse: AnaliseTributariaJSON;
@@ -197,6 +201,45 @@ export default function App() {
             }
         };
         reader.readAsText(file);
+    };
+
+    const handleSpreadsheetSelected = async (file: File) => {
+        setSpreadsheetError(null);
+        setXmlSuccessMsg(null);
+        try {
+            const { parseSpreadsheetItems } = await import('./lib/spreadsheetParser.js');
+            const items = await parseSpreadsheetItems(file);
+            setSpreadsheetImport({ fileName: file.name, items });
+        } catch (err: unknown) {
+            setSpreadsheetError(err instanceof Error ? err.message : 'Não foi possível ler a planilha selecionada.');
+        }
+    };
+
+    const handleImportSpreadsheetItems = () => {
+        if (!spreadsheetImport) return;
+
+        const itens = spreadsheetImport.items;
+        const primeiroItem = itens[0];
+        const nextOperacao: OperacaoComercial = {
+            ...operacao,
+            itens,
+            ncm: primeiroItem.ncm,
+            descricao_produto: itens.length > 1
+                ? `${primeiroItem.descricao} (+ ${itens.length - 1} outros produtos)`
+                : primeiroItem.descricao,
+            valor_operacao: itens.reduce((total, item) => total + item.quantidade * item.valor_unitario, 0),
+            valor_desconto_comercial: 0,
+            valor_frete: 0,
+            valor_despesas: 0,
+            icms_proprio_destacado: 0
+        };
+
+        setOperacao(nextOperacao);
+        setResult(null);
+        setError(null);
+        setSpreadsheetError(null);
+        setXmlSuccessMsg(`Planilha importada: ${itens.length} ${itens.length === 1 ? 'item carregado' : 'itens carregados'}. Confira os dados e execute a análise.`);
+        setSpreadsheetImport(null);
     };
 
     const handleRestoreHistory = (item: HistoricoAnaliseItem) => {
@@ -366,12 +409,23 @@ export default function App() {
                                 showThemeBar={showThemeBar}
                                 onToggleThemeBar={() => setShowThemeBar(!showThemeBar)}
                                 onXmlSelected={handleXmlSelected}
+                                onSpreadsheetSelected={handleSpreadsheetSelected}
                             />
 
                             {xmlSuccessMsg && (
                                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-3.5 rounded-xl flex items-center gap-2.5 text-xs shadow-xs">
                                     <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
                                     <span className="font-semibold">{xmlSuccessMsg}</span>
+                                </div>
+                            )}
+
+                            {spreadsheetError && (
+                                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl flex items-center gap-3 text-xs shadow-xs">
+                                    <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
+                                    <div>
+                                        <strong className="block font-bold">Falha ao importar planilha:</strong>
+                                        <span>{spreadsheetError}</span>
+                                    </div>
                                 </div>
                             )}
 
@@ -463,6 +517,15 @@ export default function App() {
                         simulacao={result.simulacaoCalculo}
                         operacao={operacao}
                         consolidado={result.consolidado}
+                    />
+                )}
+
+                {spreadsheetImport && (
+                    <SpreadsheetImportReviewModal
+                        fileName={spreadsheetImport.fileName}
+                        items={spreadsheetImport.items}
+                        onImport={handleImportSpreadsheetItems}
+                        onClose={() => setSpreadsheetImport(null)}
                     />
                 )}
 
