@@ -1,0 +1,14 @@
+export type FinalidadeCompra =
+    | "REVENDA"
+    | "USO_CONSUMO"
+    | "ATIVO_IMOBILIZADO"
+    | "INDUSTRIALIZACAO"
+    | "ORGAO_PUBLICO_CONSUMO"
+    | "SUPRIMENTO_FUNDOS";
+
+export interface SuprimentoFundosTributario {
+  suprimento_fundos: boolean;
+  texto_informacoes_adicionais: string;
+  retencao_irrf_dispensada: boolean;
+  retencoes_contribuicoes_sociais_dispensadas: boolean;
+}
