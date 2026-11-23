@@ -16,7 +16,7 @@ interface OperationFormProps {
 const UFS = ['SP','PR','RJ','SC','MG','RS','DF','GO','MS','BA','PE','CE','PA','ES','AM','MT','AL','AP','AC','MA','PB','PI','RN','RO','RR','SE','TO'];
 
 export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange, onSubmit, loading, supplier, currentTheme = 'GOV_CLASSIC' }) => {
-  const [modoMultiItem, setModoMultiItem] = useState(Boolean(operacao.itens && operacao.itens.length > 1));
+  const [modoMultiItem, setModoMultiItem] = useState<boolean>(Boolean(operacao.itens && operacao.itens.length > 1));
 
   useEffect(() => {
     if (operacao.itens && operacao.itens.length > 1) setModoMultiItem(true);
@@ -66,7 +66,7 @@ export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange
             <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">Finalidade da Compra em MT *</label>
             <select value={operacao.finalidade_compra} onChange={(e) => {
               const val = e.target.value as FinalidadeCompra;
-              onChange({ finalidade_compra: val, tipo_adquirente: val === 'ORGAO_PUBLICO_CONSUMO' || val === ('SUPRIMENTO_FUNDOS' as FinalidadeCompra) ? 'ORGAO_PUBLICO_ESTADUAL' : operacao.tipo_adquirente });
+              onChange({ finalidade_compra: val, tipo_adquirente: val === 'ORGAO_PUBLICO_CONSUMO' || val === 'SUPRIMENTO_FUNDOS' ? 'ORGAO_PUBLICO_ESTADUAL' : operacao.tipo_adquirente });
             }} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
               <option value="ORGAO_PUBLICO_CONSUMO">Aquisição para Consumo de Órgão Público Estadual</option>
               <option value="SUPRIMENTO_FUNDOS" className="font-bold text-sky-900">Suprimentos de Fundos (Dispensa IRRF e contribuições federais)</option>
@@ -75,9 +75,6 @@ export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange
               <option value="ATIVO_IMOBILIZADO">Ativo Imobilizado Privado</option>
               <option value="INDUSTRIALIZACAO">Industrialização / Insumo</option>
             </select>
-            {operacao.finalidade_compra === ('SUPRIMENTO_FUNDOS' as FinalidadeCompra) && (
-              <p class="sr-only">Aquisição realizada por meio de Suprimento de Fundos. Dispensada a retenção na fonte do Imposto de Renda (IRRF) e das contribuições sociais (CSLL, PIS/Pasep e Cofins).</p>
-            )}
           </div>
         </div>
 
