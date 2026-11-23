@@ -19,7 +19,8 @@ export type FinalidadeCompra =
     | "USO_CONSUMO"
     | "ATIVO_IMOBILIZADO"
     | "INDUSTRIALIZACAO"
-    | "ORGAO_PUBLICO_CONSUMO";
+    | "ORGAO_PUBLICO_CONSUMO"
+    | "SUPRIMENTO_FUNDOS";
 
 export interface ResumoFornecedor {
   cnpj: string;
@@ -78,20 +79,14 @@ export interface SimulacaoMemoriaCalculo {
   carga_media_percentual?: number;
   icms_estimativa_simplificada_devido?: number;
   difal_devido?: number;
-
-  // Descontos e Benefícios Fiscais
   valor_desconto_comercial?: number;
   desconto_isencao_orgao_publico?: number;
   desconto_reducao_bc_anexo_v?: number;
   economia_tributaria_total?: number;
   valor_liquido_com_desconto?: number;
-
-  // Glosa Administrativa de ICMS (Art. 2º, § 10 da IN RFB nº 1.234/2012)
   is_glosa_administrativa?: boolean;
   valor_glosa_icms?: number;
   base_calculo_irrf_efetiva?: number;
-
-  // Retenção do Imposto de Renda na Fonte (IRRF - IN RFB nº 1.234/2012 e STF Tema 1130)
   aplica_irrf_in1234?: boolean;
   aliquota_irrf_in1234?: number;
   codigo_retencao_irrf?: string;
@@ -101,7 +96,6 @@ export interface SimulacaoMemoriaCalculo {
   irrf_dispensa_valor_minimo?: boolean;
   justificativa_irrf_in1234?: string;
   valor_liquido_pagamento_fornecedor?: number;
-
   total_recolher_mt: number;
 }
 
@@ -117,8 +111,6 @@ export interface ItemNotaFiscal {
   valor_frete?: number;
   valor_despesas?: number;
   icms_proprio_destacado?: number;
-
-  // Campos fiscais extraídos do XML da NF-e
   cst?: string;
   csosn?: string;
   valor_icms_desonerado?: number;
