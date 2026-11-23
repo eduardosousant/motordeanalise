@@ -96,6 +96,10 @@ export interface SimulacaoMemoriaCalculo {
   irrf_dispensa_valor_minimo?: boolean;
   justificativa_irrf_in1234?: string;
   valor_liquido_pagamento_fornecedor?: number;
+  texto_informacoes_adicionais_nfe_nfse?: string;
+  retencao_csll_dispensada?: boolean;
+  retencao_pis_pasep_dispensada?: boolean;
+  retencao_cofins_dispensada?: boolean;
   total_recolher_mt: number;
 }
 
