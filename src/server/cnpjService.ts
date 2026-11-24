@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { normalizarPorteFiscal } from '../lib/porteFiscal.js';
 
 export interface CnpjApiResult {
   cnpj: string;
@@ -23,15 +24,7 @@ const RECEITA_WS_TOKEN = '68dab6958a51c8587fc1d988fa86a7fef418f44d6202924befbc02
  * Função auxiliar para padronizar e corrigir o Porte Fiscal caso a empresa seja MEI/SIMEI
  */
 function resolvePorte(porteBruto: string | undefined, isSimei: boolean): string {
-  if (isSimei) return 'MEI';
-  if (!porteBruto) return 'ME';
-
-  const p = porteBruto.toUpperCase().trim();
-  if (p === 'MICRO EMPRESA' || p === 'MICROEMPRESA' || p === 'ME') return 'ME';
-  if (p === 'EMPRESA DE PEQUENO PORTE' || p === 'EPP') return 'EPP';
-  if (p === 'DEMAIS' || p === 'DEMAIS/OUTROS') return 'DEMAIS';
-
-  return porteBruto;
+  return normalizarPorteFiscal(porteBruto, isSimei) || porteBruto || 'DEMAIS';
 }
 
 async function fetchFromBrasilApi(cleanDigits: string): Promise<CnpjApiResult> {
@@ -81,12 +74,17 @@ async function fetchFromOpenCnpj(cleanDigits: string): Promise<CnpjApiResult> {
   const cnaePrincipal = Array.isArray(data.cnaes) && data.cnaes.length > 0
       ? data.cnaes[0]
       : null;
+  const porteNormalizado = normalizarPorteFiscal(data.porte || data.porteFiscal, isSimei);
+  let porte = porteNormalizado || resolvePorte(data.porte || data.porteFiscal, isSimei);
+  if (!porteNormalizado && !isSimei) {
+    porte = (await fetchFromBrasilApi(cleanDigits)).porte;
+  }
 
   return {
     cnpj: data.cnpj || cleanDigits,
     razao_social: data.razaoSocial || data.razao_social || data.nome,
     nome_fantasia: data.nomeFantasia || data.nome_fantasia || data.razaoSocial || data.nome,
-    porte: resolvePorte(data.porte || data.porteFiscal, isSimei),
+    porte,
     optante_simples: isSimples,
     optante_simei: isSimei,
     uf: data.uf || 'MT',
