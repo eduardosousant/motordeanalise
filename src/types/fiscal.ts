@@ -21,6 +21,7 @@ export interface OrcamentoInput {
   cnpj: string;
   razaoSocial: string;
   regimeTributario: RegimeTributario;
+  porteFiscal?: 'MEI' | 'ME' | 'EPP' | 'DEMAIS' | 'NÃO INFORMADO';
   valor: number;
   cnaePrincipal?: string;
   descricaoCnaePrincipal?: string;

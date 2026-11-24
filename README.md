@@ -34,7 +34,9 @@ Sistema especialista em análise tributária, equalização de orçamentos e aud
 ### 5. 🔍 Consulta Inteligente de CNPJ com Failover
 - Consulta automática com cadeia de redundância (*fallback*):
   - **ReceitaWS** ➔ **CNPJ Já** ➔ **BrasilAPI** ➔ **OpenCNPJ**
-- Identificação de Regime Tributário (Simples Nacional, MEI, Lucro Presumido, Lucro Real), Porte (ME, EPP, DEMAIS), CNAE Principal e CNAEs Secundários.
+- O Motor Tributário e a Conformidade Fiscal consultam o mesmo endpoint servidor; o provedor escolhido é tentado primeiro.
+- O porte é normalizado com os dados do provedor. Quando não é informado, o resultado permanece **NÃO INFORMADO**.
+- Identificação de Regime Tributário (Simples Nacional, MEI, Lucro Presumido, Lucro Real), Porte (MEI, ME, EPP, DEMAIS ou não informado), CNAE Principal e CNAEs Secundários.
 
 ### 6. 📄 Exportação de Documentos Oficiais
 - Emissão de relatórios em **PDF** formatados para prestação de contas e instrução processual.

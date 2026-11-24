@@ -1,43 +1,44 @@
 import { AnaliseFiscalResponse, OrcamentoInput, ServicoInput, ProvedorCNPJ, InfoProvedorCNPJ } from '../types/fiscal';
+import type { CnpjApiResult } from '../types.js';
 
 export const PROVEDORES_DISPONIVEIS: InfoProvedorCNPJ[] = [
   {
     id: 'auto',
     nome: 'Automático (Multi-Provedor)',
-    descricao: 'Alternância inteligente: ReceitaWS ➔ CNPJ Já ➔ BrasilAPI ➔ OpenCNPJ',
-    url: 'Multi-API com failover',
+    descricao: 'Consulta centralizada no servidor com failover entre provedores',
+    url: '/api/cnpj/',
     tipo: 'comercial_token',
     ativo: true,
   },
   {
     id: 'receitaws',
-    nome: 'ReceitaWS (Token Ativo)',
-    descricao: 'Consulta direta em receitaws.com.br/v1/cnpj/{cnpj}',
-    url: 'https://receitaws.com.br/v1/cnpj/',
+    nome: 'ReceitaWS',
+    descricao: 'Provedor preferencial consultado pelo servidor',
+    url: '/api/cnpj/',
     tipo: 'comercial_token',
     ativo: true,
   },
   {
     id: 'cnpja',
-    nome: 'CNPJ Já (Chave Ativa)',
-    descricao: 'Consulta direta em open.cnpja.com/office/{cnpj}',
-    url: 'https://open.cnpja.com/office/',
-    tipo: 'chave_api',
+    nome: 'CNPJ Já',
+    descricao: 'Provedor preferencial consultado pelo servidor',
+    url: '/api/cnpj/',
+    tipo: 'publica',
     ativo: true,
   },
   {
     id: 'brasilapi',
     nome: 'BrasilAPI (Pública)',
-    descricao: 'Consulta direta em brasilapi.com.br/cnpj/v1/{cnpj}',
-    url: 'https://brasilapi.com.br/api/cnpj/v1/',
+    descricao: 'Provedor preferencial consultado pelo servidor',
+    url: '/api/cnpj/',
     tipo: 'publica',
     ativo: true,
   },
   {
     id: 'opencnpj',
     nome: 'OpenCNPJ (Pública)',
-    descricao: 'Consulta direta em api.opencnpj.org/{cnpj}',
-    url: 'https://api.opencnpj.org/',
+    descricao: 'Provedor preferencial consultado pelo servidor',
+    url: '/api/cnpj/',
     tipo: 'publica',
     ativo: true,
   },
@@ -75,12 +76,10 @@ export async function enviarParaAnalise(
   }
 }
 
-export async function consultarCNPJ(
-  cnpj: string,
-  provedor: ProvedorCNPJ = 'auto'
-): Promise<{
+export interface ConsultaCNPJResult {
   razaoSocial?: string;
-  regimeTributario?: any;
+  regimeTributario?: OrcamentoInput['regimeTributario'];
+  porteFiscal: CnpjApiResult['porte'];
   cnaePrincipal?: string;
   descricaoCnae?: string;
   cnaesSecundarios?: string[];
@@ -88,205 +87,72 @@ export async function consultarCNPJ(
   provedor?: string;
   msgProtecao?: string;
   failoverAcionado?: boolean;
-} | null> {
+}
+
+function formatarCnae(codigo?: string): string | undefined {
+  const digits = (codigo || '').replace(/\D/g, '');
+  if (digits.length !== 7) return digits || undefined;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 5)}/${digits.slice(5, 7)}`;
+}
+
+const PROVEDOR_POR_FONTE: Record<string, ProvedorCNPJ> = {
+  ReceitaWS: 'receitaws',
+  'CNPJ Já': 'cnpja',
+  BrasilAPI: 'brasilapi',
+  OpenCNPJ: 'opencnpj',
+};
+
+export async function consultarCNPJ(
+  cnpj: string,
+  provedor: ProvedorCNPJ = 'auto',
+): Promise<ConsultaCNPJResult | null> {
   const digits = cnpj.replace(/\D/g, '');
   if (digits.length !== 14) return null;
 
-  // 1. Tenta via proxy backend com o provedor escolhido
-  try {
-    const res = await fetch(`/api/consultar-cnpj/${digits}?provedor=${provedor}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.sucesso && data.dados) {
-        return {
-          ...data.dados,
-          provedor: data.origem || provedor,
-          msgProtecao: data.msgProtecao,
-          failoverAcionado: data.failoverAcionado,
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('Erro ao consultar CNPJ no backend, acionando estratégias diretas:', err);
+  const response = await fetch(`/api/cnpj/${digits}?provider=${encodeURIComponent(provedor)}`);
+  const body: unknown = await response.json().catch(() => null);
+  const responseData = body !== null && typeof body === 'object'
+    ? body as Record<string, unknown>
+    : {};
+
+  if (!response.ok) {
+    const message = typeof responseData.error === 'string'
+      ? responseData.error
+      : `Erro HTTP ${response.status} ao consultar CNPJ.`;
+    throw new Error(message);
   }
 
-  // 2. Fallbacks diretos no cliente para alta disponibilidade
-  // Se escolheu BrasilAPI ou modo auto:
-  if (provedor === 'auto' || provedor === 'brasilapi') {
-    try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
-      if (res.ok) {
-        const dados = await res.json();
-        const isMei = dados.opcao_pelo_mei === true || dados.opcao_pelo_mei === 'S' || dados.opcaoMei === 'S';
-        const isSimples = dados.opcao_pelo_simples === true || dados.opcao_pelo_simples === 'S' || dados.opcaoSimples === 'S';
+  const data = body as CnpjApiResult;
+  const atividadesSecundarias = (data.cnaes_secundarios || []).map(cnae => ({
+    cnae: formatarCnae(cnae.codigo) || cnae.codigo,
+    descricao: cnae.descricao || 'Atividade econômica secundária',
+  }));
+  const isMei = data.optante_simei;
+  const regimeTributario: OrcamentoInput['regimeTributario'] = isMei
+    ? 'MEI'
+    : data.optante_simples
+      ? 'SIMPLES_NACIONAL'
+      : 'LUCRO_PRESUMIDO';
+  const provedorOrigem = PROVEDOR_POR_FONTE[data.fonte_api] || provedor;
+  const failoverAcionado = provedor === 'auto'
+    ? data.fonte_api !== 'ReceitaWS'
+    : provedorOrigem !== provedor;
 
-        let regime = 'LUCRO_PRESUMIDO';
-        if (isMei) regime = 'MEI';
-        else if (isSimples) regime = 'SIMPLES_NACIONAL';
-
-        const rawCnae = String(dados.cnae_fiscal || '');
-        const cnaeFmt = rawCnae.length === 7
-          ? `${rawCnae.slice(0, 4)}-${rawCnae.slice(4, 5)}/${rawCnae.slice(5, 7)}`
-          : rawCnae;
-
-        const cnaesSecundarios: string[] = [];
-        const atividadesSecundarias: Array<{ cnae: string; descricao: string }> = [];
-        if (Array.isArray(dados.cnaes_secundarios)) {
-          dados.cnaes_secundarios.forEach((s: any) => {
-            const rawSec = String(s.codigo || '');
-            const secFmt = rawSec.length === 7
-              ? `${rawSec.slice(0, 4)}-${rawSec.slice(4, 5)}/${rawSec.slice(5, 7)}`
-              : rawSec;
-            if (secFmt) {
-              cnaesSecundarios.push(secFmt);
-              atividadesSecundarias.push({
-                cnae: secFmt,
-                descricao: s.descricao || 'Atividade econômica secundária',
-              });
-            }
-          });
-        }
-
-        return {
-          razaoSocial: dados.razao_social || dados.nome_fantasia,
-          regimeTributario: regime,
-          cnaePrincipal: cnaeFmt || '4321-5/00',
-          descricaoCnae: dados.cnae_fiscal_descricao,
-          cnaesSecundarios,
-          atividadesSecundarias,
-          provedor: 'brasilapi',
-        };
-      }
-    } catch {
-      // continua para próximo
-    }
-  }
-
-  // Se escolheu OpenCNPJ ou modo auto:
-  if (provedor === 'auto' || provedor === 'opencnpj') {
-    try {
-      const res = await fetch(`https://api.opencnpj.org/${digits}`);
-      if (res.ok) {
-        const rawJson = await res.json();
-        const dados = (rawJson && rawJson.data && typeof rawJson.data === 'object' && !Array.isArray(rawJson.data))
-          ? rawJson.data
-          : rawJson;
-
-        const isMei =
-          dados.opcaoMei === 'S' ||
-          dados.opcao_mei === 'S' ||
-          dados.opcaoMei === 'SIM' ||
-          dados.opcao_mei === 'SIM' ||
-          dados.opcaoMei === true ||
-          dados.opcao_mei === true ||
-          dados.opcao_pelo_mei === 'S' ||
-          dados.opcao_pelo_mei === true ||
-          dados.opcaoPeloMei === 'S' ||
-          dados.opcaoPeloMei === true ||
-          dados.optante_simei === 'S' ||
-          dados.optante_simei === true ||
-          dados.optanteSimei === 'S' ||
-          dados.optanteSimei === true ||
-          dados.simples?.optante_simei === true ||
-          dados.simples?.optante_simei === 'S' ||
-          dados.simei?.optante === true ||
-          dados.simei?.optant === true ||
-          dados.porte === 'MEI';
-
-        const isSimples =
-          dados.opcaoSimples === 'S' ||
-          dados.opcao_simples === 'S' ||
-          dados.opcaoSimples === 'SIM' ||
-          dados.opcao_simples === 'SIM' ||
-          dados.opcaoSimples === true ||
-          dados.opcao_simples === true ||
-          dados.opcao_pelo_simples === 'S' ||
-          dados.opcao_pelo_simples === true ||
-          dados.opcaoPeloSimples === 'S' ||
-          dados.opcaoPeloSimples === true ||
-          dados.optante_simples === 'S' ||
-          dados.optante_simples === true ||
-          dados.optanteSimples === 'S' ||
-          dados.optanteSimples === true ||
-          dados.simples?.optante === true ||
-          dados.simples?.optant === true;
-
-        let regime = 'LUCRO_PRESUMIDO';
-        if (isMei) regime = 'MEI';
-        else if (isSimples) regime = 'SIMPLES_NACIONAL';
-
-        let cnaeCode = dados.cnae_principal || dados.cnaePrincipal || dados.cnae_fiscal || dados.cnaeFiscal || '';
-        let desc = 'Atividade econômica principal';
-
-        if (Array.isArray(dados.cnaes) && dados.cnaes.length > 0) {
-          const princ = dados.cnaes.find((c: any) => c.is_principal === true);
-          if (princ) {
-            cnaeCode = princ.codigo || princ.cnae;
-            desc = princ.descricao || desc;
-          } else if (!cnaeCode) {
-            cnaeCode = dados.cnaes[0].codigo || dados.cnaes[0].cnae;
-            desc = dados.cnaes[0].descricao || desc;
-          }
-        }
-
-        const rawCnae = String(cnaeCode).replace(/\D/g, '');
-        const cnaeFmt = rawCnae.length === 7
-          ? `${rawCnae.slice(0, 4)}-${rawCnae.slice(4, 5)}/${rawCnae.slice(5, 7)}`
-          : rawCnae;
-
-        const cnaesSecundarios: string[] = [];
-        const atividadesSecundarias: Array<{ cnae: string; descricao: string }> = [];
-
-        if (Array.isArray(dados.cnaes)) {
-          const secs = dados.cnaes.filter((c: any) => {
-            if (c.is_principal === true) return false;
-            const cod = c.codigo || c.cnae;
-            return cod && cod !== cnaeCode;
-          });
-
-          secs.forEach((sec: any) => {
-            const rawSec = String(sec.codigo || sec.cnae || '').replace(/\D/g, '');
-            const secFmt = rawSec.length === 7
-              ? `${rawSec.slice(0, 4)}-${rawSec.slice(4, 5)}/${rawSec.slice(5, 7)}`
-              : rawSec;
-            if (secFmt) {
-              cnaesSecundarios.push(secFmt);
-              atividadesSecundarias.push({
-                cnae: secFmt,
-                descricao: sec.descricao || 'Atividade econômica secundária',
-              });
-            }
-          });
-        }
-
-        return {
-          razaoSocial: dados.razao_social || dados.razaoSocial || dados.nome || dados.nome_fantasia || dados.nomeFantasia,
-          regimeTributario: regime,
-          cnaePrincipal: cnaeFmt || '4321-5/00',
-          descricaoCnae: desc,
-          cnaesSecundarios,
-          atividadesSecundarias,
-          provedor: 'opencnpj',
-        };
-      }
-    } catch {
-      // continua
-    }
-  }
-
-  // Fallback padrão se não houver conexão externa
   return {
-    razaoSocial: `Prestador de Serviços Cadastrado (CNPJ ${digits.slice(-4)})`,
-    regimeTributario: 'SIMPLES_NACIONAL',
-    cnaePrincipal: '4321-5/00',
-    descricaoCnae: 'Serviços cadastrados',
-    cnaesSecundarios: ['4322-3/01', '4329-1/04', '4330-4/04'],
-    atividadesSecundarias: [
-      { cnae: '4322-3/01', descricao: 'Instalações hidráulicas, sanitárias e de gás' },
-      { cnae: '4329-1/04', descricao: 'Montagem e instalação de outros equipamentos' },
-      { cnae: '4330-4/04', descricao: 'Serviços de pintura de edifícios em geral' },
-    ],
-    provedor: 'fallback_offline',
+    razaoSocial: data.razao_social,
+    regimeTributario,
+    porteFiscal: data.porte,
+    cnaePrincipal: formatarCnae(data.cnae_principal_codigo),
+    descricaoCnae: data.cnae_principal_descricao,
+    cnaesSecundarios: atividadesSecundarias.map(atividade => atividade.cnae),
+    atividadesSecundarias,
+    provedor: provedorOrigem,
+    failoverAcionado,
+    msgProtecao: failoverAcionado
+      ? provedor === 'auto'
+        ? `Consulta automática concluída via ${data.fonte_api}.`
+        : `O provedor preferencial não respondeu; consulta concluída via ${data.fonte_api}.`
+      : undefined,
   };
 }
 
