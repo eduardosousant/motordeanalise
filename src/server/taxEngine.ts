@@ -4,6 +4,7 @@ import path from 'path';
 import { OperacaoComercial, AnaliseTributariaJSON, SimulacaoMemoriaCalculo } from '../types.js';
 import { consultarNcmOficialMT, verificarNcmNoAnexoX } from '../data/ncmDatabase.js';
 import { calcularEnquadramentoItem, getIrrfClassification, isCombustivelMonofasico } from '../lib/taxCalculations.js';
+import { aplicarDispensaSuprimentoFundos, isSuprimentoFundos } from '../lib/suprimentoFundosRules.js';
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -57,7 +58,7 @@ function buildCacheKey(op: OperacaoComercial): string {
   const ufDestino = (op.uf_destino || 'MT').toUpperCase();
   const simples = Boolean(op.simples_remetente) ? 'SIMPLES' : 'NORMAL';
   const porte = (op.porte_remetente || 'ME').toUpperCase();
-  const adquirente = (op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO')).toUpperCase();
+  const adquirente = (op.tipo_adquirente || ((op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || op.finalidade_compra === 'SUPRIMENTO_FUNDOS') ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO')).toUpperCase();
   const finalidade = (op.finalidade_compra || 'REVENDA').toUpperCase();
 
   return `${ncmClean}_${ufOrigem}_${ufDestino}_${simples}_${porte}_${adquirente}_${finalidade}`;
@@ -217,7 +218,7 @@ FORMATO ESTRITO DE RESPOSTA JSON EXIGIDO:
 
       const promptUser = `Realize a análise tributária para o Estado de Mato Grosso com base nos dados desta operação:
 - CNPJ Fornecedor: ${operacao.cnpj_fornecedor} (${operacao.razao_social_fornecedor || 'Fornecedor Consultado'})
-- Tipo do Adquirente em MT: ${operacao.tipo_adquirente === 'ORGAO_PUBLICO_ESTADUAL' || operacao.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ÓRGÃO PÚBLICO ESTADUAL / SECRETARIA / AUTARQUIA / FUNDAÇÃO DE MT' : 'Empresa Privada'}
+- Tipo do Adquirente em MT: ${operacao.tipo_adquirente === 'ORGAO_PUBLICO_ESTADUAL' || operacao.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || operacao.finalidade_compra === 'SUPRIMENTO_FUNDOS' ? 'ÓRGÃO PÚBLICO ESTADUAL / SECRETARIA / AUTARQUIA / FUNDAÇÃO DE MT' : 'Empresa Privada'}
 - UF Origem: ${operacao.uf_origem} -> UF Destino: ${operacao.uf_destino || 'MT'}
 - Porte Fornecedor: ${operacao.porte_remetente || 'ME'} | Optante Simples Nacional: ${operacao.simples_remetente ? 'SIM' : 'NÃO'}
 - NCM: ${operacao.ncm}
@@ -389,7 +390,7 @@ function computeSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON
     icmsOrigem = 0;
   }
 
-  const isOrgaoPublico = op.tipo_adquirente === 'ORGAO_PUBLICO_ESTADUAL' || op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO';
+  const isOrgaoPublico = op.tipo_adquirente === 'ORGAO_PUBLICO_ESTADUAL' || op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || op.finalidade_compra === 'SUPRIMENTO_FUNDOS';
   const regime = jsonRes.enquadramento_produto.regime_tributario_aplicavel;
   const isSimples = Boolean(op.simples_remetente);
   const isStProduct = regime === 'Substituição Tributária' || checkProductSt(op.ncm, op.descricao_produto);
@@ -482,7 +483,7 @@ function computeSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON
     }
   }
 
-  return {
+  let simulacao: SimulacaoMemoriaCalculo = {
     base_calculo_origem: valorTotal,
     icms_origem_destacado: icmsOrigem,
     mva_percentual: mvaNum,
@@ -509,6 +510,12 @@ function computeSimulation(op: OperacaoComercial, jsonRes: AnaliseTributariaJSON
 
     total_recolher_mt: totalRecolher
   };
+
+  if (isSuprimentoFundos(op.finalidade_compra)) {
+    simulacao = aplicarDispensaSuprimentoFundos(simulacao, valorTotal);
+  }
+
+  return simulacao;
 }
 
 function computeDeterministicAnalysis(op: OperacaoComercial): {
@@ -523,7 +530,7 @@ function computeDeterministicAnalysis(op: OperacaoComercial): {
   const ufOrigem = (op.uf_origem || 'SP').toUpperCase();
   const isSimples = Boolean(op.simples_remetente);
   const porte = op.porte_remetente || 'ME';
-  const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
+  const tipoAdquirente = op.tipo_adquirente || ((op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || op.finalidade_compra === 'SUPRIMENTO_FUNDOS') ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
   const isOrgaoPublico = tipoAdquirente === 'ORGAO_PUBLICO_ESTADUAL';
 
   const enq = calcularEnquadramentoItem(
@@ -671,5 +678,9 @@ function computeDeterministicAnalysis(op: OperacaoComercial): {
     total_recolher_mt: 0
   };
 
-  return { jsonResponse, simulacaoCalculo };
+  const simulacaoFinal = isSuprimentoFundos(op.finalidade_compra)
+    ? aplicarDispensaSuprimentoFundos(simulacaoCalculo, valorTotal)
+    : simulacaoCalculo;
+
+  return { jsonResponse, simulacaoCalculo: simulacaoFinal };
 }
