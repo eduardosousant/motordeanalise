@@ -1,4 +1,4 @@
-export type PorteEmpresa = "MEI" | "ME" | "EPP" | "DEMAIS";
+export type PorteEmpresa = "MEI" | "ME" | "EPP" | "DEMAIS" | "NÃO INFORMADO";
 
 export type AppTheme = 'INSTITUCIONAL' | 'FINTECH_PRO' | 'DARK_AUDITOR' | 'GOV_CLASSIC';
 
