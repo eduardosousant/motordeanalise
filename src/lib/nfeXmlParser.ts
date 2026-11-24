@@ -114,7 +114,7 @@ export function parseNfeXml(xmlString: string): ParsedNfeData {
         cnpj: cnpjFornecedor,
         razao_social: razaoSocial,
         nome_fantasia: nomeFantasia,
-        porte: isSimples ? 'EPP / ME' : 'DEMAIS (Regime Normal)',
+        porte: 'NÃO INFORMADO',
         optante_simples: isSimples,
         optante_simei: false,
         uf: ufOrigem,

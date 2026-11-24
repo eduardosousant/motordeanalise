@@ -19,7 +19,6 @@ import {
   RefreshCw,
   HelpCircle,
   Lock,
-  ShieldCheck,
 } from 'lucide-react';
 import { OrcamentoInput, RegimeTributario, ProvedorCNPJ } from '../types/fiscal';
 import { formatarCNPJ, formatarMoeda, validarCNPJ, formatarCNAE } from '../utils/formatters';
@@ -41,6 +40,7 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
   cnaeServico,
 }) => {
   const [consultandoCnpj, setConsultandoCnpj] = useState<Record<string, boolean>>({});
+  const [erroConsultaCnpj, setErroConsultaCnpj] = useState<Record<string, string>>({});
   const [expandirSecundarios, setExpandirSecundarios] = useState<Record<string, boolean>>({});
   const [provedorAtivo, setProvedorAtivo] = useState<ProvedorCNPJ>('auto');
   const [mostrarDetalhesApi, setMostrarDetalhesApi] = useState<boolean>(false);
@@ -51,11 +51,13 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
     if (clean.length !== 14) return;
     const provedorEscolhido = prov || provedorAtivo;
     setConsultandoCnpj(prev => ({ ...prev, [id]: true }));
+    setErroConsultaCnpj(prev => ({ ...prev, [id]: '' }));
     try {
       const dados = await consultarCNPJ(clean, provedorEscolhido);
       if (dados) {
         if (dados.razaoSocial) onAtualizar(id, 'razaoSocial', dados.razaoSocial);
         if (dados.regimeTributario) onAtualizar(id, 'regimeTributario', dados.regimeTributario);
+        onAtualizar(id, 'porteFiscal', dados.porteFiscal);
         if (dados.cnaePrincipal) onAtualizar(id, 'cnaePrincipal', dados.cnaePrincipal);
         if (dados.descricaoCnae) onAtualizar(id, 'descricaoCnaePrincipal', dados.descricaoCnae);
         if (dados.cnaesSecundarios) onAtualizar(id, 'cnaesSecundarios', dados.cnaesSecundarios);
@@ -72,6 +74,10 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
       }
     } catch (err) {
       console.error('Erro na consulta do CNPJ:', err);
+      setErroConsultaCnpj(prev => ({
+        ...prev,
+        [id]: err instanceof Error ? err.message : 'Falha temporária ao consultar CNPJ.',
+      }));
     } finally {
       setConsultandoCnpj(prev => ({ ...prev, [id]: false }));
     }
@@ -95,9 +101,9 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
   const getNomeProvedorBadge = (origem?: string) => {
     switch (origem) {
       case 'receitaws':
-        return { label: 'ReceitaWS (Token Ativo)', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+        return { label: 'ReceitaWS', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
       case 'cnpja':
-        return { label: 'CNPJ Já (Chave Ativa)', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { label: 'CNPJ Já', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
       case 'brasilapi':
         return { label: 'BrasilAPI', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
       case 'opencnpj':
@@ -216,7 +222,7 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              Digite o CNPJ para preenchimento automático da Razão Social, Regime Tributário e CNAE Principal via API
+              Digite o CNPJ para preenchimento automático da Razão Social, Regime Tributário, Porte Fiscal e CNAE Principal
             </p>
           </div>
         </div>
@@ -249,7 +255,7 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
             className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors self-start md:self-auto"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            {mostrarDetalhesApi ? 'Ocultar detalhes técnicos' : 'Ver endpoints e chaves'}
+            {mostrarDetalhesApi ? 'Ocultar detalhes técnicos' : 'Ver detalhes da consulta'}
           </button>
         </div>
 
@@ -281,17 +287,13 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
           })}
         </div>
 
-        {/* Indicador de Proteção Ativa Contra Rate Limit (3 req/min) */}
+        {/* Consulta centralizada: provedores externos são acessados somente pelo servidor. */}
         <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-200/60 text-[11px]">
           <div className="flex items-center gap-1.5 text-emerald-700 font-medium">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>
-              <strong>Proteção Anti-Limite Ativa:</strong> Limite de 3 req/min monitorado e blindado com failover automático e cache inteligente
+              <strong>Consulta protegida pelo servidor:</strong> provedor escolhido como preferência, com failover automático.
             </span>
           </div>
-          <span className="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-            0% de erro 429
-          </span>
         </div>
 
         {/* Notificação dinâmica de proteção / failover acionado */}
@@ -302,60 +304,11 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
           </div>
         )}
 
-        {/* Detalhes expandíveis dos endpoints e tokens */}
+        {/* Detalhes da consulta compartilhada pelos módulos do sistema */}
         {mostrarDetalhesApi && (
           <div className="mt-3 pt-3 border-t border-slate-200/70 text-xs text-slate-600 space-y-1.5 bg-white/70 p-3 rounded-lg">
-            <div className="font-semibold text-slate-800 text-[11px] mb-1">Endpoints e chaves integradas ao sistema:</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
-              <div className="p-2 rounded bg-slate-50 border border-slate-200">
-                <span className="font-bold text-slate-800">1. ReceitaWS:</span>{' '}
-                <code className="text-[10px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded">
-                  https://receitaws.com.br/v1/cnpj/{'{cnpj}'}
-                </code>
-                <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-                  ✓ Token Comercial configurado + Proteção de taxa (3 req/min)
-                </div>
-              </div>
-
-              <div className="p-2 rounded bg-slate-50 border border-slate-200">
-                <span className="font-bold text-slate-800">2. CNPJ Já:</span>{' '}
-                <code className="text-[10px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded">
-                  https://open.cnpja.com/office/{'{cnpj}'}
-                </code>
-                <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-                  ✓ Chave Corporativa da API ativa (sem restrição de 3 req/min)
-                </div>
-              </div>
-
-              <div className="p-2 rounded bg-slate-50 border border-slate-200">
-                <span className="font-bold text-slate-800">3. BrasilAPI:</span>{' '}
-                <code className="text-[10px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded">
-                  https://brasilapi.com.br/cnpj/v1/{'{cnpj}'}
-                </code>
-                <div className="text-[10px] text-slate-500 mt-0.5">
-                  ✓ API Aberta governamental e comunitária com monitoramento de taxa
-                </div>
-              </div>
-
-              <div className="p-2 rounded bg-slate-50 border border-slate-200">
-                <span className="font-bold text-slate-800">4. OpenCNPJ:</span>{' '}
-                <code className="text-[10px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded">
-                  https://api.opencnpj.org/{'{CNPJ}'}
-                </code>
-                <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-                  ✓ API Aberta rápida sem limite estrito de 3 req/min (ideal para rajadas)
-                </div>
-              </div>
-            </div>
-            <div className="p-2 rounded bg-blue-50/70 border border-blue-200 text-[11px] text-blue-900 mt-2 space-y-1">
-              <p className="font-semibold text-blue-950">Como funciona a prevenção contra erros de taxa (429 / 3 req/min)?</p>
-              <ul className="list-disc list-inside space-y-0.5 text-blue-800 text-[10px]">
-                <li><strong>Monitoramento de Janela Deslizante:</strong> O servidor rastreia o número de requisições por minuto em cada provedor.</li>
-                <li><strong>Cooldown Preditivo:</strong> Se um provedor atinge 3 req/min, o servidor não força nova chamada nele e não trava a tela do usuário.</li>
-                <li><strong>Failover Instantâneo:</strong> A consulta é redirecionada no mesmo milissegundo para o OpenCNPJ ou CNPJ Já.</li>
-                <li><strong>Cache em Memória:</strong> Consultas a CNPJs repetidos são respondidas em 0ms sem consumir cotas de nenhuma API.</li>
-              </ul>
-            </div>
+            <p>As áreas Tributário e Conformidade Fiscal usam o mesmo endpoint do servidor. O serviço tenta primeiro o provedor selecionado e, em caso de falha, tenta os demais provedores disponíveis.</p>
+            <p>O porte fiscal é normalizado quando informado pelo provedor; quando ausente, é exibido como “Não informado”.</p>
           </div>
         )}
       </div>
@@ -485,6 +438,12 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
                         </div>
                       )}
                     </div>
+                    {erroConsultaCnpj[orc.id] && (
+                      <p role="alert" className="mt-1.5 flex items-start gap-1 text-[10px] text-rose-700">
+                        <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                        {erroConsultaCnpj[orc.id]}
+                      </p>
+                    )}
                   </div>
 
                   {/* Valor (R$) */}
@@ -544,7 +503,7 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
                         <Lock className="w-3 h-3 text-slate-400" title="Bloqueado para edição manual" />
                       </label>
                       <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded font-medium border border-slate-200 flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5 text-slate-500" /> Base Oficial RFB
+                        <Lock className="w-2.5 h-2.5 text-slate-500" />                         Dados cadastrais consultados
                       </span>
                     </div>
                     <div
@@ -552,7 +511,7 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
                       className={`w-full px-3 py-2 text-xs border rounded-lg flex items-center justify-between shadow-2xs select-none bg-slate-50/80 cursor-not-allowed ${
                         REGIME_ROTULOS[orc.regimeTributario]?.badge || 'text-slate-800 border-slate-200'
                       }`}
-                      title="Regime tributário apurado oficialmente via consulta cadastral da Receita Federal (não editável manualmente)."
+                      title="Regime preenchido a partir dos dados retornados pela consulta CNPJ (não editável manualmente)."
                     >
                       <div className="flex items-center gap-1.5 truncate">
                         <span className="truncate">
@@ -564,8 +523,13 @@ export const OrcamentosManager: React.FC<OrcamentosManagerProps> = ({
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                      <span>Definido pela base oficial da Receita Federal (edição manual desativada).</span>
+                      <span>Preenchido pelos dados retornados pela consulta (edição manual desativada).</span>
                     </p>
+                    {orc.porteFiscal && (
+                      <p className="mt-1 text-[10px] text-slate-600">
+                        Porte fiscal: <strong>{orc.porteFiscal === 'NÃO INFORMADO' ? 'Não informado pela API' : orc.porteFiscal}</strong>
+                      </p>
+                    )}
                   </div>
 
                   {/* CNAE Principal (Auto via API) */}

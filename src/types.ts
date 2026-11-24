@@ -180,6 +180,7 @@ export interface CnpjApiResult {
   municipio: string;
   cnae_principal_codigo?: string;
   cnae_principal_descricao?: string;
+  cnaes_secundarios?: Array<{ codigo: string; descricao?: string }>;
   situacao_cadastral?: string;
   fonte_api: string;
 }

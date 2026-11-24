@@ -10,7 +10,7 @@ interface CnpjCardProps {
   currentTheme?: AppTheme;
 }
 
-export type CnpjApiProvider = 'AUTO' | 'BRASIL_API' | 'OPEN_CNPJ' | 'RECEITA_WS';
+export type CnpjApiProvider = 'AUTO' | 'BRASIL_API' | 'OPEN_CNPJ' | 'RECEITA_WS' | 'CNPJA';
 
 export const CnpjCard: React.FC<CnpjCardProps> = ({
   onSupplierLoaded,
@@ -148,6 +148,7 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({
               <option value="BRASIL_API">BrasilAPI</option>
               <option value="OPEN_CNPJ">OpenCNPJ</option>
               <option value="RECEITA_WS">ReceitaWS</option>
+              <option value="CNPJA">CNPJ Já</option>
             </select>
           </div>
         </div>

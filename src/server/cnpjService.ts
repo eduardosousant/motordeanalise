@@ -1,164 +1,385 @@
-import fetch from 'node-fetch';
 import { normalizarPorteFiscal } from '../lib/porteFiscal.js';
+import type { PorteEmpresa } from '../types.js';
 
 export interface CnpjApiResult {
   cnpj: string;
   razao_social: string;
   nome_fantasia?: string;
-  porte: string;
+  porte: PorteEmpresa;
   optante_simples: boolean;
   optante_simei: boolean;
   uf?: string;
   municipio?: string;
   cnae_principal_codigo?: string;
   cnae_principal_descricao?: string;
+  cnaes_secundarios?: Array<{ codigo: string; descricao?: string }>;
   situacao_cadastral: string;
   fonte_api: string;
 }
 
-export type CnpjApiProvider = 'AUTO' | 'BRASIL_API' | 'OPEN_CNPJ' | 'RECEITA_WS';
+export type CnpjApiProvider = 'AUTO' | 'BRASIL_API' | 'OPEN_CNPJ' | 'RECEITA_WS' | 'CNPJA';
 
-const RECEITA_WS_TOKEN = '68dab6958a51c8587fc1d988fa86a7fef418f44d6202924befbc024661673606';
+type ProviderFailureKind = 'not_found' | 'unavailable';
+type JsonRecord = Record<string, unknown>;
 
-/**
- * Função auxiliar para padronizar e corrigir o Porte Fiscal caso a empresa seja MEI/SIMEI
- */
-function resolvePorte(porteBruto: string | undefined, isSimei: boolean): string {
-  return normalizarPorteFiscal(porteBruto, isSimei) || porteBruto || 'DEMAIS';
+const PROVIDER_ORDER: Exclude<CnpjApiProvider, 'AUTO'>[] = [
+  'RECEITA_WS',
+  'CNPJA',
+  'BRASIL_API',
+  'OPEN_CNPJ',
+];
+
+export class CnpjConsultationError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 404 | 503,
+    readonly code: 'INVALID_CNPJ' | 'INVALID_PROVIDER' | 'CNPJ_NOT_FOUND' | 'PROVIDERS_UNAVAILABLE',
+  ) {
+    super(message);
+    this.name = 'CnpjConsultationError';
+  }
 }
 
-async function fetchFromBrasilApi(cleanDigits: string): Promise<CnpjApiResult> {
-  const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanDigits}`);
-  if (!res.ok) throw new Error('BrasilAPI retornou erro HTTP ' + res.status);
-
-  const data: any = await res.json();
-  const isSimei = Boolean(data.opcao_pelo_mei);
-  const isSimples = Boolean(data.opcao_pelo_simples) || isSimei;
-
-  return {
-    cnpj: data.cnpj || cleanDigits,
-    razao_social: data.razao_social,
-    nome_fantasia: data.nome_fantasia || data.razao_social,
-    porte: resolvePorte(data.porte, isSimei),
-    optante_simples: isSimples,
-    optante_simei: isSimei,
-    uf: data.uf,
-    municipio: data.municipio,
-    cnae_principal_codigo: data.cnae_fiscal ? String(data.cnae_fiscal) : undefined,
-    cnae_principal_descricao: data.cnae_fiscal_descricao,
-    situacao_cadastral: data.descricao_situacao_cadastral || 'ATIVA',
-    fonte_api: 'BrasilAPI'
-  };
+class ProviderFailure extends Error {
+  constructor(
+    readonly provider: Exclude<CnpjApiProvider, 'AUTO'>,
+    readonly kind: ProviderFailureKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ProviderFailure';
+  }
 }
 
-async function fetchFromOpenCnpj(cleanDigits: string): Promise<CnpjApiResult> {
-  const res = await fetch(`https://kitana.opencnpj.com/cnpj/${cleanDigits}`);
-  if (!res.ok) throw new Error('OpenCNPJ retornou erro HTTP ' + res.status);
-
-  const responseJson: any = await res.json();
-  const data = responseJson.data || responseJson;
-
-  const isSimei =
-      data.opcaoMei === 'S' ||
-      data.opcaoMei === true ||
-      data.simples_nacional?.mei === true ||
-      String(data.mei).toLowerCase() === 'sim';
-
-  const isSimples =
-      data.opcaoSimples === 'S' ||
-      data.opcaoSimples === true ||
-      data.simples_nacional?.optante === true ||
-      String(data.simples).toLowerCase() === 'sim' ||
-      isSimei;
-
-  const cnaePrincipal = Array.isArray(data.cnaes) && data.cnaes.length > 0
-      ? data.cnaes[0]
-      : null;
-  const porteNormalizado = normalizarPorteFiscal(data.porte || data.porteFiscal, isSimei);
-  let porte = porteNormalizado || resolvePorte(data.porte || data.porteFiscal, isSimei);
-  if (!porteNormalizado && !isSimei) {
-    porte = (await fetchFromBrasilApi(cleanDigits)).porte;
+export function parseCnpjProvider(value: unknown): CnpjApiProvider {
+  if (value === undefined || value === null || value === '') return 'AUTO';
+  if (typeof value !== 'string') {
+    throw new CnpjConsultationError('Provedor de consulta inválido.', 400, 'INVALID_PROVIDER');
   }
 
-  return {
-    cnpj: data.cnpj || cleanDigits,
-    razao_social: data.razaoSocial || data.razao_social || data.nome,
-    nome_fantasia: data.nomeFantasia || data.nome_fantasia || data.razaoSocial || data.nome,
-    porte,
-    optante_simples: isSimples,
-    optante_simei: isSimei,
-    uf: data.uf || 'MT',
-    municipio: data.municipio || 'Cuiabá',
-    cnae_principal_codigo: cnaePrincipal?.cnae || data.cnae_principal,
-    cnae_principal_descricao: cnaePrincipal?.descricao || data.cnae_descricao,
-    situacao_cadastral: data.situacaoCadastral || data.situacao || 'ATIVA',
-    fonte_api: 'OpenCNPJ'
-  };
+  const provider = value.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  switch (provider) {
+    case 'AUTO':
+      return 'AUTO';
+    case 'BRASIL_API':
+    case 'BRASILAPI':
+      return 'BRASIL_API';
+    case 'OPEN_CNPJ':
+    case 'OPENCNPJ':
+      return 'OPEN_CNPJ';
+    case 'RECEITA_WS':
+    case 'RECEITAWS':
+      return 'RECEITA_WS';
+    case 'CNPJA':
+    case 'CNPJ_JA':
+      return 'CNPJA';
+    default:
+      throw new CnpjConsultationError('Provedor de consulta inválido.', 400, 'INVALID_PROVIDER');
+  }
 }
 
-async function fetchFromReceitaWs(cleanDigits: string): Promise<CnpjApiResult> {
-  const res = await fetch(`https://receitaws.com.br/v1/cnpj/${cleanDigits}`, {
-    headers: {
-      'Authorization': `Bearer ${RECEITA_WS_TOKEN}`
-    }
+function asRecord(value: unknown): JsonRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as JsonRecord
+    : {};
+}
+
+function getPath(value: unknown, ...path: string[]): unknown {
+  return path.reduce<unknown>((current, key) => asRecord(current)[key], value);
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+function isTrue(...values: unknown[]): boolean {
+  return values.some(value =>
+    value === true ||
+    value === 1 ||
+    (typeof value === 'string' && ['S', 'SIM', 'TRUE', 'YES', '1'].includes(value.trim().toUpperCase())),
+  );
+}
+
+function normalizeCnae(value: unknown): string | undefined {
+  const cnae = firstString(value)?.replace(/\D/g, '');
+  return cnae || undefined;
+}
+
+function normalizeSecondaryCnaes(value: unknown): Array<{ codigo: string; descricao?: string }> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const cnaes = value.flatMap(item => {
+    const data = asRecord(item);
+    const codigo = normalizeCnae(data.codigo ?? data.cnae ?? data.code ?? data.id);
+    return codigo
+      ? [{ codigo, descricao: firstString(data.descricao, data.text, data.description) }]
+      : [];
   });
+  return cnaes.length ? cnaes : undefined;
+}
 
-  if (!res.ok) throw new Error('ReceitaWS retornou erro HTTP ' + res.status);
-
-  const data: any = await res.json();
-  if (data.status === 'ERROR') {
-    throw new Error(data.message || 'CNPJ não encontrado na ReceitaWS');
+function buildResult(
+  provider: Exclude<CnpjApiProvider, 'AUTO'>,
+  cleanDigits: string,
+  data: {
+    cnpj?: unknown;
+    razaoSocial?: unknown;
+    nomeFantasia?: unknown;
+    porte?: unknown;
+    isSimei: boolean;
+    isSimples: boolean;
+    uf?: unknown;
+    municipio?: unknown;
+    cnaeCodigo?: unknown;
+    cnaeDescricao?: unknown;
+    cnaesSecundarios?: unknown;
+    situacao?: unknown;
+  },
+): CnpjApiResult {
+  const razaoSocial = firstString(data.razaoSocial, data.nomeFantasia);
+  if (!razaoSocial) {
+    throw new ProviderFailure(provider, 'unavailable', 'O provedor retornou dados cadastrais incompletos.');
   }
 
-  const isSimei = Boolean(data.simei?.optante);
-  const isSimples = Boolean(data.simples?.optante) || isSimei;
+  const sourceNames: Record<Exclude<CnpjApiProvider, 'AUTO'>, string> = {
+    RECEITA_WS: 'ReceitaWS',
+    CNPJA: 'CNPJ Já',
+    BRASIL_API: 'BrasilAPI',
+    OPEN_CNPJ: 'OpenCNPJ',
+  };
 
   return {
-    cnpj: cleanDigits,
-    razao_social: data.nome,
-    nome_fantasia: data.fantasia || data.nome,
-    porte: resolvePorte(data.porte, isSimei),
-    optante_simples: isSimples,
-    optante_simei: isSimei,
-    uf: data.uf,
-    municipio: data.municipio,
-    cnae_principal_codigo: data.atividade_principal?.[0]?.code ? String(data.atividade_principal[0].code).replace(/\D/g, '') : undefined,
-    cnae_principal_descricao: data.atividade_principal?.[0]?.text,
-    situacao_cadastral: data.situacao || 'ATIVA',
-    fonte_api: 'ReceitaWS'
+    cnpj: firstString(data.cnpj) || cleanDigits,
+    razao_social: razaoSocial,
+    nome_fantasia: firstString(data.nomeFantasia) || undefined,
+    porte: normalizarPorteFiscal(data.porte, data.isSimei) || 'NÃO INFORMADO',
+    optante_simples: data.isSimples || data.isSimei,
+    optante_simei: data.isSimei,
+    uf: firstString(data.uf),
+    municipio: firstString(data.municipio),
+    cnae_principal_codigo: normalizeCnae(data.cnaeCodigo),
+    cnae_principal_descricao: firstString(data.cnaeDescricao),
+    cnaes_secundarios: normalizeSecondaryCnaes(data.cnaesSecundarios),
+    situacao_cadastral: firstString(data.situacao) || 'ATIVA',
+    fonte_api: sourceNames[provider],
   };
 }
 
-export async function fetchCnpjData(cnpj: string, provider: CnpjApiProvider = 'AUTO'): Promise<CnpjApiResult> {
+async function fetchJson(
+  provider: Exclude<CnpjApiProvider, 'AUTO'>,
+  url: string,
+  headers?: HeadersInit,
+): Promise<JsonRecord> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new ProviderFailure(provider, 'unavailable', `${provider} indisponível.`);
+  }
+
+  if (!response.ok) {
+    const kind = response.status === 404 ? 'not_found' : 'unavailable';
+    throw new ProviderFailure(provider, kind, `${provider} retornou HTTP ${response.status}.`);
+  }
+
+  let json: unknown;
+  try {
+    json = await response.json();
+  } catch {
+    throw new ProviderFailure(provider, 'unavailable', `${provider} retornou uma resposta inválida.`);
+  }
+
+  return asRecord(json);
+}
+
+function dataForBrasilApi(data: JsonRecord, cnpj: string): CnpjApiResult {
+  const isSimei = isTrue(data.opcao_pelo_mei, data.opcao_mei);
+  return buildResult('BRASIL_API', cnpj, {
+    cnpj: data.cnpj,
+    razaoSocial: data.razao_social,
+    nomeFantasia: data.nome_fantasia,
+    porte: data.porte,
+    isSimei,
+    isSimples: isTrue(data.opcao_pelo_simples, data.opcao_simples),
+    uf: data.uf,
+    municipio: data.municipio,
+    cnaeCodigo: data.cnae_fiscal,
+    cnaeDescricao: data.cnae_fiscal_descricao,
+    cnaesSecundarios: data.cnaes_secundarios,
+    situacao: data.descricao_situacao_cadastral,
+  });
+}
+
+function dataForOpenCnpj(response: JsonRecord, cnpj: string): CnpjApiResult {
+  const data = asRecord(response.data ?? response);
+  const cnaes = Array.isArray(data.cnaes) ? data.cnaes : [];
+  const principal = cnaes.find(item => asRecord(item).is_principal === true) ?? cnaes[0];
+  const principalData = asRecord(principal);
+  const isSimei = isTrue(
+    data.opcaoMei,
+    data.opcao_mei,
+    data.opcao_pelo_mei,
+    data.optante_simei,
+    data.optanteSimei,
+    getPath(data, 'simples_nacional', 'mei'),
+    getPath(data, 'simples', 'optante_simei'),
+    getPath(data, 'simei', 'optante'),
+    getPath(data, 'simei', 'optant'),
+    data.porte === 'MEI',
+  );
+  const isSimples = isTrue(
+    data.opcaoSimples,
+    data.opcao_simples,
+    data.opcao_pelo_simples,
+    data.optante_simples,
+    data.optanteSimples,
+    getPath(data, 'simples_nacional', 'optante'),
+    getPath(data, 'simples', 'optante'),
+    getPath(data, 'simples', 'optant'),
+  );
+
+  return buildResult('OPEN_CNPJ', cnpj, {
+    cnpj: data.cnpj,
+    razaoSocial: data.razaoSocial ?? data.razao_social ?? data.nome,
+    nomeFantasia: data.nomeFantasia ?? data.nome_fantasia,
+    porte: data.porte ?? data.porteFiscal,
+    isSimei,
+    isSimples,
+    uf: data.uf,
+    municipio: data.municipio,
+    cnaeCodigo: principalData.cnae ?? principalData.codigo ?? data.cnae_principal,
+    cnaeDescricao: principalData.descricao ?? data.cnae_descricao,
+    cnaesSecundarios: cnaes.filter(item => item !== principal),
+    situacao: data.situacaoCadastral ?? data.situacao,
+  });
+}
+
+function dataForCnpja(data: JsonRecord, cnpj: string): CnpjApiResult {
+  const company = asRecord(data.company);
+  const address = asRecord(data.address);
+  const mainActivity = asRecord(data.mainActivity ?? data.main_activity);
+  const size = asRecord(company.size ?? data.size);
+  const status = asRecord(data.status);
+  const simples = asRecord(data.simples);
+  const simei = asRecord(data.simei);
+
+  return buildResult('CNPJA', cnpj, {
+    cnpj: data.taxId ?? data.cnpj,
+    razaoSocial: company.name ?? data.name ?? data.razao_social,
+    nomeFantasia: data.alias ?? data.nome_fantasia,
+    porte: size.text ?? size.name ?? size.id ?? data.porte,
+    isSimei: isTrue(
+      simei.optant,
+      simei.optante,
+      getPath(data, 'simples', 'optante_simei'),
+      data.opcao_pelo_mei,
+    ),
+    isSimples: isTrue(simples.optant, simples.optante, data.opcao_pelo_simples),
+    uf: address.state ?? data.uf,
+    municipio: address.city ?? data.municipio,
+    cnaeCodigo: mainActivity.id ?? mainActivity.code ?? data.cnae_fiscal,
+    cnaeDescricao: mainActivity.text ?? mainActivity.description ?? data.cnae_fiscal_descricao,
+    cnaesSecundarios: data.sideActivities ?? data.cnaes_secundarios,
+    situacao: status.text ?? data.situacao,
+  });
+}
+
+function dataForReceitaWs(data: JsonRecord, cnpj: string): CnpjApiResult {
+  if (String(data.status || '').toUpperCase() === 'ERROR') {
+    const message = firstString(data.message) || 'ReceitaWS não conseguiu consultar o CNPJ.';
+    const kind = /não encontrado|nao encontrado|not found/i.test(message) ? 'not_found' : 'unavailable';
+    throw new ProviderFailure('RECEITA_WS', kind, message);
+  }
+
+  const activity = Array.isArray(data.atividade_principal) ? asRecord(data.atividade_principal[0]) : {};
+  const simei = asRecord(data.simei);
+  const simples = asRecord(data.simples);
+  return buildResult('RECEITA_WS', cnpj, {
+    cnpj,
+    razaoSocial: data.nome,
+    nomeFantasia: data.fantasia,
+    porte: data.porte,
+    isSimei: isTrue(simei.optante),
+    isSimples: isTrue(simples.optante),
+    uf: data.uf,
+    municipio: data.municipio,
+    cnaeCodigo: activity.code,
+    cnaeDescricao: activity.text,
+    cnaesSecundarios: data.atividade_secundaria,
+    situacao: data.situacao,
+  });
+}
+
+async function fetchFromProvider(
+  provider: Exclude<CnpjApiProvider, 'AUTO'>,
+  cnpj: string,
+): Promise<CnpjApiResult> {
+  switch (provider) {
+    case 'RECEITA_WS': {
+      const token = process.env.RECEITAWS_TOKEN;
+      if (!token) {
+        throw new ProviderFailure('RECEITA_WS', 'unavailable', 'Credencial da ReceitaWS não configurada.');
+      }
+      const data = await fetchJson(
+        provider,
+        `https://receitaws.com.br/v1/cnpj/${cnpj}`,
+        { Authorization: `Bearer ${token}` },
+      );
+      return dataForReceitaWs(data, cnpj);
+    }
+    case 'CNPJA':
+      return dataForCnpja(await fetchJson(provider, `https://open.cnpja.com/office/${cnpj}`), cnpj);
+    case 'BRASIL_API':
+      return dataForBrasilApi(await fetchJson(provider, `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`), cnpj);
+    case 'OPEN_CNPJ':
+      return dataForOpenCnpj(await fetchJson(provider, `https://api.opencnpj.org/${cnpj}`), cnpj);
+  }
+}
+
+export async function fetchCnpjData(
+  cnpj: string,
+  preferredProvider: unknown = 'AUTO',
+): Promise<CnpjApiResult> {
   const cleanDigits = cnpj.replace(/\D/g, '');
-
   if (cleanDigits.length !== 14) {
-    throw new Error('CNPJ inválido. Informe 14 dígitos numéricos.');
+    throw new CnpjConsultationError('CNPJ inválido. Informe 14 dígitos numéricos.', 400, 'INVALID_CNPJ');
   }
 
-  // 1. Execução direta quando o usuário fixa um provedor específico
-  if (provider === 'BRASIL_API') return await fetchFromBrasilApi(cleanDigits);
-  if (provider === 'OPEN_CNPJ') return await fetchFromOpenCnpj(cleanDigits);
-  if (provider === 'RECEITA_WS') return await fetchFromReceitaWs(cleanDigits);
+  const provider = parseCnpjProvider(preferredProvider);
+  const providers = provider === 'AUTO'
+    ? PROVIDER_ORDER
+    : [provider, ...PROVIDER_ORDER.filter(candidate => candidate !== provider)];
+  const failures: ProviderFailure[] = [];
 
-  // 2. Execução 'AUTO' (Mecanismo de Fallback em cadeia)
-  try {
-    return await fetchFromBrasilApi(cleanDigits);
-  } catch (err) {
-    console.warn('[CNPJ Backend] BrasilAPI falhou. Tentando OpenCNPJ...', err);
+  for (const candidate of providers) {
+    try {
+      return await fetchFromProvider(candidate, cleanDigits);
+    } catch (error) {
+      const failure = error instanceof ProviderFailure
+        ? error
+        : new ProviderFailure(candidate, 'unavailable', `${candidate} retornou uma resposta inválida.`);
+      failures.push(failure);
+      console.warn(`[CNPJ Backend] ${failure.message}`);
+    }
   }
 
-  try {
-    return await fetchFromOpenCnpj(cleanDigits);
-  } catch (err) {
-    console.warn('[CNPJ Backend] OpenCNPJ falhou. Tentando ReceitaWS...', err);
+  if (failures.length > 0 && failures.every(failure => failure.kind === 'not_found')) {
+    throw new CnpjConsultationError(
+      'CNPJ não encontrado nas APIs consultadas.',
+      404,
+      'CNPJ_NOT_FOUND',
+    );
   }
 
-  try {
-    return await fetchFromReceitaWs(cleanDigits);
-  } catch (err) {
-    console.error('[CNPJ Backend] ReceitaWS falhou:', err);
-  }
-
-  throw new Error('Não foi possível obter os dados do CNPJ em nenhuma das APIs parceiras.');
+  throw new CnpjConsultationError(
+    'As APIs de consulta de CNPJ estão temporariamente indisponíveis. Tente novamente.',
+    503,
+    'PROVIDERS_UNAVAILABLE',
+  );
 }

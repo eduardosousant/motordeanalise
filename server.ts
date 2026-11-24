@@ -1,14 +1,15 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { exec } from 'child_process';
-import { fetchCnpjData } from './src/server/cnpjService.js';
+import { CnpjConsultationError, fetchCnpjData } from './src/server/cnpjService.js';
 import { processTaxAnalysis, getTaxCacheStats } from './src/server/taxEngine.js';
 import { calcularEnquadramentoItem, computeConsolidatedSimulation, normalizarRetencaoIRRF } from './src/lib/taxCalculations.js';
 import { OperacaoComercial } from './src/types.js';
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '1mb' }));
 
@@ -31,15 +32,18 @@ async function startServer() {
     }
   });
 
-  // Consulta CNPJ com Fallback (CNPJa -> CNPJ.ws -> BrasilAPI -> MinhaReceita -> Internal Engine)
+  // Consulta CNPJ pelo pipeline compartilhado de provedores
   app.get('/api/cnpj/:cnpj', async (req, res) => {
     try {
-      const cnpjParam = req.params.cnpj;
-      const data = await fetchCnpjData(cnpjParam);
+      const provider = req.query.provider ?? req.query.provedor;
+      const data = await fetchCnpjData(req.params.cnpj, provider);
       res.json(data);
     } catch (error: any) {
+      if (error instanceof CnpjConsultationError) {
+        return res.status(error.status).json({ error: error.message, code: error.code });
+      }
       console.error('Erro na consulta CNPJ:', error);
-      res.status(400).json({ error: error.message || 'Erro ao consultar CNPJ' });
+      res.status(503).json({ error: 'Erro temporário ao consultar CNPJ.', code: 'PROVIDERS_UNAVAILABLE' });
     }
   });
 
