@@ -11,8 +11,8 @@ import { verificarNcmNoAnexoX, consultarNcmOficialMT } from '../data/ncmDatabase
 import { aplicarDispensaSuprimentoFundos, isSuprimentoFundos } from './suprimentoFundosRules.js';
 
 /**
- * Função utilitária equivalente ao TRUNCAR(valor; 2) do Excel.
- * Corta as casas decimais a partir da 2ª casa sem realizar arredondamento.
+- Função utilitária equivalente ao TRUNCAR(valor; 2) do Excel.
+- Corta as casas decimais a partir da 2ª casa sem realizar arredondamento.
  */
 export function truncar(valor: number, casas: number = 2): number {
   if (isNaN(valor) || !isFinite(valor)) return 0;
@@ -21,7 +21,7 @@ export function truncar(valor: number, casas: number = 2): number {
 }
 
 /**
- * Multiplica dois números e trunca o resultado em 2 casas decimais (estilo Excel TRUNCAR).
+- Multiplica dois números e trunca o resultado em 2 casas decimais (estilo Excel TRUNCAR).
  */
 export function multiplicarETruncar(num1: number, num2: number, casas: number = 2): number {
   return truncar(num1 * num2, casas);
@@ -671,7 +671,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       desconto_isencao_orgao_publico: enq.descIsencao > 0 ? enq.descIsencao : undefined,
       valor_liquido_com_desconto: (enq.descIsencao + enq.valorGlosaIcms) > 0 ? truncar(valorLiquidoBaseItem - (enq.descIsencao + enq.valorGlosaIcms), 2) : undefined,
       valor_irrf_calculado: enq.irrf,
-      valor_irrf_retido: enq.irrf,
+      valor_irrf_retido: obterValorRetidoIRRF(enq.irrf),
       aliquota_irrf_in1234: enq.aliquotaIrrf,
       valor_liquido_pagamento_fornecedor: enq.liquidoItem
     };
@@ -720,9 +720,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
   } else {
     const aliqUnica = itensAnalise[0]?.simulacao.aliquota_irrf_in1234 || 1.20;
     const isStUnico = itensAnalise[0]?.jsonResponse.enquadramento_produto.regime_tributario_aplicavel?.includes('Substituição');
-    if (isCombustivelMonofasico(primeiro.item.ncm)) {
-      orientacaoConsolidada = primeiro.jsonResponse.orientacao_fiscal;
-    } else if (isStUnico) {
+    if (isStUnico) {
       orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Art. 65 § 3º Anexo IV): 1) PRODUTO EM SUBSTITUIÇÃO TRIBUTÁRIA (CST 60): A isenção de ICMS não se aplica a mercadorias sob ST. 2) A Nota Fiscal é faturada pelo valor integral sem desconto de ICMS. 3) Retenção na fonte de IRRF de ${aliqUnica.toFixed(2)}% no pagamento ao fornecedor.`;
     } else if (primeiro.simulacao.is_glosa_administrativa) {
       orientacaoConsolidada = `ALERTA DE GLOSA ADMINISTRATIVA (Art. 2º, § 10 da IN RFB 1.234/2012): A NF-e não trouxe o ICMS desonerado formal. Glosa financeira de R$ ${resumo.total_glosa_icms.toFixed(2)} aplicada no pagamento. A retenção de IRRF (${aliqUnica}%) incide obrigatoriamente sobre o valor original da nota.`;
@@ -801,108 +799,83 @@ export function getCstInfo(
     ncm?: string
 ): CstInfo {
   const ncmAtual = ncm || jsonResponse?.enquadramento_produto?.ncm || '';
-  const regimeAtual = jsonResponse?.enquadramento_produto?.regime_tributario_aplicavel || '';
-  if (isCombustivelMonofasico(ncmAtual) || regimeAtual.includes('Monofásica')) {
+  const regimeAtual =
+      jsonResponse?.enquadramento_produto?.regime_tributario_aplicavel || '';
+  const cstFromEngine = jsonResponse?.enquadramento_produto?.cst_codigo;
+
+  // O parâmetro explícito tem prioridade sobre o dado da análise.
+  const isSimples =
+      optanteSimples !== undefined
+          ? optanteSimples
+          : Boolean(jsonResponse?.resumo_fornecedor?.optante_simples);
+
+  // Exceção: a regra monofásica não sugere CST/CSOSN.
+  if (
+      isCombustivelMonofasico(ncmAtual) ||
+      regimeAtual.includes('Monofásica')
+  ) {
     return {
       codigo: '—',
       tipo: 'REGIME',
       descricao: 'Tributação monofásica',
-      descricaoCompleta: 'Combustível classificado como monofásico pelo NCM. A regra não define um CST específico; não aplicar CST 40 nem desconto do Art. 65.',
+      descricaoCompleta:
+          'Combustível classificado como monofásico pelo NCM. A regra não define um CST específico; não aplicar CST 40 nem desconto do Art. 65.',
       badgeClass: 'bg-sky-100 text-sky-900 border-sky-300'
     };
   }
 
-  const isSimples = optanteSimples !== undefined ? optanteSimples : Boolean(jsonResponse?.resumo_fornecedor?.optante_simples);
-  const cstFromEngine = jsonResponse?.enquadramento_produto?.cst_codigo;
+  const isSt =
+      cstFromEngine === '500' ||
+      cstFromEngine === '60' ||
+      regimeAtual.includes('Substituição Tributária') ||
+      consultarNcmOficialMT(ncmAtual, jsonResponse?.enquadramento_produto?.descricao).isSt;
 
-  if (cstFromEngine) {
-    if (cstFromEngine === '500') {
-      return {
-        codigo: '500',
-        tipo: 'CSOSN',
-        descricao: 'ICMS cobrado anteriormente por ST',
-        descricaoCompleta: 'CSOSN 500 - ICMS cobrado anteriormente por substituição tributária (revenda a consumidor final / órgão público)',
-        badgeClass: 'bg-purple-100 text-purple-900 border-purple-300'
-      };
-    }
-    if (cstFromEngine === '102') {
-      return {
-        codigo: '102',
-        tipo: 'CSOSN',
-        descricao: 'Tributada no Simples sem crédito',
-        descricaoCompleta: 'CSOSN 102 - Tributada pelo Simples Nacional sem permissão de crédito (Sem desconto de isenção estadual - OT CGE-MT nº 03/2026)',
-        badgeClass: 'bg-amber-100 text-amber-900 border-amber-300'
-      };
-    }
-    if (cstFromEngine === '60') {
-      return {
-        codigo: '60',
-        tipo: 'CST',
-        descricao: 'ICMS cobrado anteriormente por ST',
-        descricaoCompleta: 'CST 60 - ICMS cobrado anteriormente por substituição tributária (Comércio Varejista / Consumidor Final - Anexo X RICMS/MT)',
-        badgeClass: 'bg-purple-100 text-purple-900 border-purple-300'
-      };
-    }
-    if (cstFromEngine === '40') {
-      return {
-        codigo: '40',
-        tipo: 'CST',
-        descricao: 'Isenta c/ Desconto Obrigatório',
-        descricaoCompleta: 'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I do RICMS/MT c/c Convênio ICMS 73/2004)',
-        badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
-      };
-    }
-    if (cstFromEngine === '00') {
-      return {
-        codigo: '00',
-        tipo: 'CST',
-        descricao: 'Tributada integralmente',
-        descricaoCompleta: 'CST 00 - Tributada integralmente (Operação com destaque de ICMS na origem e/ou interna MT)',
-        badgeClass: 'bg-teal-100 text-teal-900 border-teal-300'
-      };
-    }
-  }
-
-  const isSt = verificarNcmNoAnexoX(ncmAtual);
-
+  // Verificar o regime antes de interpretar códigos recebidos pelo motor.
   if (isSimples) {
-    if (isSt) {
-      return {
-        codigo: '500',
-        tipo: 'CSOSN',
-        descricao: 'ICMS cobrado anteriormente por ST',
-        descricaoCompleta: 'CSOSN 500 - ICMS cobrado anteriormente por substituição tributária (revenda a consumidor final / órgão público)',
-        badgeClass: 'bg-purple-100 text-purple-900 border-purple-300'
-      };
-    }
-    return {
-      codigo: '102',
-      tipo: 'CSOSN',
-      descricao: 'Tributada no Simples sem crédito',
-      descricaoCompleta: 'CSOSN 102 - Tributada pelo Simples Nacional sem permissão de crédito (Sem desconto de isenção estadual - OT CGE-MT nº 03/2026)',
-      badgeClass: 'bg-amber-100 text-amber-900 border-amber-300'
-    };
+    return isSt
+        ? {
+            codigo: '500',
+            tipo: 'CSOSN',
+            descricao: 'ICMS cobrado anteriormente por ST',
+            descricaoCompleta:
+                'CSOSN 500 - ICMS cobrado anteriormente por substituição tributária (revenda a consumidor final / órgão público)',
+            badgeClass: 'bg-purple-100 text-purple-900 border-purple-300'
+          }
+        : {
+            codigo: '102',
+            tipo: 'CSOSN',
+            descricao: 'Tributada no Simples sem crédito',
+            descricaoCompleta:
+                'CSOSN 102 - Tributada pelo Simples Nacional sem permissão de crédito (Sem desconto de isenção estadual - OT CGE-MT nº 03/2026)',
+            badgeClass: 'bg-amber-100 text-amber-900 border-amber-300'
+          };
   }
 
+  // A partir daqui, o fornecedor é do regime normal: sugerir somente CST.
   if (isSt) {
     return {
       codigo: '60',
       tipo: 'CST',
       descricao: 'ICMS cobrado anteriormente por ST',
-      descricaoCompleta: 'CST 60 - ICMS cobrado anteriormente por substituição tributária (Comércio Varejista / Consumidor Final - Anexo X RICMS/MT)',
+      descricaoCompleta:
+          'CST 60 - ICMS cobrado anteriormente por substituição tributária (Comércio Varejista / Consumidor Final - Anexo X RICMS/MT)',
       badgeClass: 'bg-purple-100 text-purple-900 border-purple-300'
     };
   }
 
-  const isIsento = (simulacao?.desconto_isencao_orgao_publico !== undefined && simulacao.desconto_isencao_orgao_publico > 0) ||
-      jsonResponse?.enquadramento_produto?.regime_tributario_aplicavel?.includes('Isento');
+  const isIsento =
+      cstFromEngine === '40' ||
+      Boolean(simulacao?.is_glosa_administrativa) ||
+      (simulacao?.desconto_isencao_orgao_publico ?? 0) > 0 ||
+      regimeAtual.includes('Isento');
 
   if (isIsento) {
     return {
       codigo: '40',
       tipo: 'CST',
       descricao: 'Isenta c/ Desconto Obrigatório',
-      descricaoCompleta: 'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I do RICMS/MT c/c Convênio ICMS 73/2004)',
+      descricaoCompleta:
+          'CST 40 - Isenta (Aquisição por Órgão Público Estadual de MT - Art. 2º do Anexo I do RICMS/MT c/c Convênio ICMS 73/2004)',
       badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300'
     };
   }
@@ -911,7 +884,8 @@ export function getCstInfo(
     codigo: '00',
     tipo: 'CST',
     descricao: 'Tributada integralmente',
-    descricaoCompleta: 'CST 00 - Tributada integralmente (Operação com destaque de ICMS na origem e/ou interna MT)',
+    descricaoCompleta:
+        'CST 00 - Tributada integralmente (Operação com destaque de ICMS na origem e/ou interna MT)',
     badgeClass: 'bg-teal-100 text-teal-900 border-teal-300'
   };
 }
