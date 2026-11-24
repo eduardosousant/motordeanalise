@@ -63,7 +63,9 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
     const valorBrutoTotal = simulacao.base_calculo_origem + (simulacao.valor_desconto_comercial || 0);
 
     // Texto de instrução e enquadramento formatado de forma dinâmica para Multi-Itens ou Item Único
-    const textoOrientacaoConsolidado = isCombustivelMono && !temMultiplosItens
+    const textoOrientacaoConsolidado = operacao.finalidade_compra === 'SUPRIMENTO_FUNDOS'
+        ? simulacao.texto_informacoes_adicionais_nfe_nfse || 'Aquisição realizada por meio de Suprimento de Fundos. Dispensada a retenção na fonte do Imposto de Renda (IRRF) e das contribuições sociais (CSLL, PIS/Pasep e Cofins), nos termos do art. 4º, inciso XXI, da Instrução Normativa RFB nº 1.234/2012, c/c arts. 45 a 47 do Decreto nº 93.872/1986.'
+        : isCombustivelMono && !temMultiplosItens
         ? `TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS: O NCM ${ncmAtual} enquadra o item no grupo monofásico. Não utilizar CST 40 nem aplicar desconto de ICMS desonerado do Art. 65. O faturamento deve ocorrer pelo VALOR INTEGRAL da proposta; esta análise não sugere um CST específico.`
         : temMultiplosItens && consolidado
         ? (isOptanteSimples
@@ -277,7 +279,13 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                     Finalidade da Compra:
                                 </span>
                                 <strong style={{ color: '#0f172a', fontSize: '10px' }}>
-                                    {operacao.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'Uso e Consumo Órgão Público' : 'Comercialização / Revenda'}
+                                    {operacao.finalidade_compra === 'SUPRIMENTO_FUNDOS'
+                                        ? 'Suprimento de Fundos'
+                                        : operacao.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO'
+                                            ? 'Uso e Consumo Órgão Público'
+                                            : operacao.finalidade_compra === 'REVENDA'
+                                                ? 'Comercialização / Revenda'
+                                                : operacao.finalidade_compra}
                                 </strong>
                             </div>
                         </div>
@@ -801,7 +809,30 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                 )}
 
                                 {/* Retenção IRRF */}
-                                {simulacao.valor_irrf_retido !== undefined && simulacao.valor_irrf_retido > 0 && !isOptanteSimples ? (
+                                {simulacao.codigo_retencao_irrf === 'DISPENSADO' && simulacao.justificativa_irrf_in1234?.includes('Suprimento de Fundos') ? (
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            fontSize: '9px',
+                                            padding: '5px 8px',
+                                            backgroundColor: '#f0fdf4',
+                                            borderRadius: '4px',
+                                            border: '1px solid #86efac',
+                                            color: '#166534',
+                                            fontWeight: 700
+                                        }}
+                                    >
+                                        <span>
+                                            IRRF e contribuições sociais:
+                                            <span style={{ fontSize: '8px', fontWeight: 600, display: 'block' }}>
+                                                Dispensa para aquisição por Suprimento de Fundos (Art. 4º, XXI, IN RFB nº 1.234/2012)
+                                            </span>
+                                        </span>
+                                        <span style={{ fontFamily: 'monospace' }}>R$ 0,00</span>
+                                    </div>
+                                ) : simulacao.valor_irrf_retido !== undefined && simulacao.valor_irrf_retido > 0 && !isOptanteSimples ? (
                                     <div
                                         style={{
                                             display: 'flex',

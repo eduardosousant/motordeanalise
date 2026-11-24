@@ -8,6 +8,7 @@ import {
   ResumoConsolidadoNota
 } from '../types.js';
 import { verificarNcmNoAnexoX, consultarNcmOficialMT } from '../data/ncmDatabase.js';
+import { aplicarDispensaSuprimentoFundos, isSuprimentoFundos } from './suprimentoFundosRules.js';
 
 /**
  * Função utilitária equivalente ao TRUNCAR(valor; 2) do Excel.
@@ -276,7 +277,7 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
   const valorTotal = truncar(valorProdutosComDesconto + (Number(op.valor_frete) || 0) + (Number(op.valor_despesas) || 0), 2);
 
   const isSimples = Boolean(op.simples_remetente);
-  const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
+  const tipoAdquirente = op.tipo_adquirente || ((op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || op.finalidade_compra === 'SUPRIMENTO_FUNDOS') ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
   const isOrgaoPublico = tipoAdquirente === 'ORGAO_PUBLICO_ESTADUAL';
 
   const primeiroItem = op.itens && op.itens.length > 0 ? op.itens[0] : null;
@@ -317,7 +318,7 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
     justificativaIrrfFinal += ` Valor calculado de R$ ${enq.irrf.toFixed(2)}, inferior a R$ 10,00: demonstrado, mas dispensado da retenção para autarquia estadual sem SIAFI (Art. 3º, § 6º da IN RFB nº 1.234/2012).`;
   }
 
-  return {
+  const simulacao: SimulacaoMemoriaCalculo = {
     base_calculo_origem: valorTotal,
     base_calculo_irrf_efetiva: enq.baseCalculoIrrf,
     is_glosa_administrativa: enq.isGlosaAdministrativa,
@@ -340,6 +341,10 @@ export function computeClientSimulation(op: OperacaoComercial, jsonRes: AnaliseT
 
     total_recolher_mt: 0
   };
+
+  return isSuprimentoFundos(op.finalidade_compra)
+    ? aplicarDispensaSuprimentoFundos(simulacao, valorTotal)
+    : simulacao;
 }
 
 export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
@@ -354,7 +359,7 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
 
   const isSimples = Boolean(op.simples_remetente);
   const porte = op.porte_remetente || 'ME';
-  const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
+  const tipoAdquirente = op.tipo_adquirente || ((op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || op.finalidade_compra === 'SUPRIMENTO_FUNDOS') ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
   const isOrgaoPublico = tipoAdquirente === 'ORGAO_PUBLICO_ESTADUAL';
 
   const primeiroItem = op.itens && op.itens.length > 0 ? op.itens[0] : null;
@@ -533,9 +538,13 @@ export function computeDeterministicAnalysisLocal(op: OperacaoComercial): {
     total_recolher_mt: 0
   };
 
+  const simulacaoFinal = isSuprimentoFundos(op.finalidade_compra)
+    ? aplicarDispensaSuprimentoFundos(simulacaoCalculo, valorTotal)
+    : simulacaoCalculo;
+
   return {
     jsonResponse,
-    simulacaoCalculo,
+    simulacaoCalculo: simulacaoFinal,
     fonteAnalise: 'MOTOR_DETERMINISTICO_LOCAL'
   };
 }
@@ -617,7 +626,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
   }
 
   const isSimples = Boolean(op.simples_remetente);
-  const tipoAdquirente = op.tipo_adquirente || (op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
+  const tipoAdquirente = op.tipo_adquirente || ((op.finalidade_compra === 'ORGAO_PUBLICO_CONSUMO' || op.finalidade_compra === 'SUPRIMENTO_FUNDOS') ? 'ORGAO_PUBLICO_ESTADUAL' : 'PRIVADO');
 
   const itensAnalise: AnaliseItemFiscal[] = op.itens.map(it => {
     const valorBrutoItem = truncar((it.quantidade || 1) * (it.valor_unitario || 0), 2);
@@ -667,6 +676,10 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
       valor_liquido_pagamento_fornecedor: enq.liquidoItem
     };
 
+    const simulacaoSuprimento = isSuprimentoFundos(op.finalidade_compra)
+      ? aplicarDispensaSuprimentoFundos(simulacaoAtualizada, valorLiquidoBaseItem)
+      : simulacaoAtualizada;
+
     const jsonAtualizado: AnaliseTributariaJSON = {
       ...det.jsonResponse,
       enquadramento_produto: {
@@ -682,7 +695,7 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
         valor_total: valorBrutoItem
       },
       jsonResponse: jsonAtualizado,
-      simulacao: simulacaoAtualizada
+      simulacao: simulacaoSuprimento
     };
   });
 
@@ -696,7 +709,9 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
 
   let orientacaoConsolidada = "";
 
-  if (!temMultiplosItens && temCombustivelMonofasico) {
+  if (isSuprimentoFundos(op.finalidade_compra)) {
+    orientacaoConsolidada = 'Aquisição realizada por meio de Suprimento de Fundos. Dispensada a retenção na fonte do IRRF e das contribuições sociais (CSLL, PIS/Pasep e Cofins), nos termos do art. 4º, inciso XXI, da Instrução Normativa RFB nº 1.234/2012, c/c arts. 45 a 47 do Decreto nº 93.872/1986.';
+  } else if (!temMultiplosItens && temCombustivelMonofasico) {
     orientacaoConsolidada = primeiro.jsonResponse.orientacao_fiscal;
   } else if (isSimples) {
     orientacaoConsolidada = `CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL${temCombustivelMonofasico ? '' : ' (CSOSN 102/500)'}: A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica.${temCombustivelMonofasico ? ' Os itens com NCM do grupo de combustíveis são classificados como monofásicos, sem sugestão de CST, sem CST 40 e sem desconto do Art. 65.' : ''} 2) A Nota Fiscal deve ser faturada pelo VALOR INTEGRAL da proposta sem desconto. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012).`;
