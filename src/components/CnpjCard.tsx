@@ -216,7 +216,11 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({
                       Porte Fiscal
                     </span>
                                       <span className="font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded inline-block mt-0.5 shadow-2xs">
-                      {currentSupplier.optante_simei ? 'MEI (SIMEI)' : currentSupplier.porte}
+                      {currentSupplier.optante_simei
+                        ? 'MEI (SIMEI)'
+                        : currentSupplier.porte === 'NÃO INFORMADO'
+                          ? 'Não informado pela API'
+                          : currentSupplier.porte}
                     </span>
                   </div>
 

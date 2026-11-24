@@ -13,6 +13,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    let openCnpjFallback: Record<string, unknown> | null = null;
+
     // 1. Tenta OpenCNPJ
     if (provider === 'OPEN_CNPJ' || provider === 'AUTO') {
       try {
@@ -26,21 +28,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const porte = normalizarPorteFiscal(data.porte || data.porteFiscal, isSimei);
           const cnaePrincipal = Array.isArray(data.cnaes) && data.cnaes.length > 0 ? data.cnaes[0] : null;
 
-          if (porte) {
-            return res.status(200).json({
+          if (data.cnpj || data.razaoSocial || data.razao_social || data.nome) {
+            openCnpjFallback = {
               cnpj: data.cnpj || cleanDigits,
               razao_social: data.razaoSocial || data.razao_social || data.nome,
-              nome_fantasia: data.nomeFantasia || data.nome_fantasia || data.razaoSocial,
-              porte,
+              nome_fantasia: data.nomeFantasia || data.nome_fantasia || data.razaoSocial || data.nome,
+              porte: porte || 'NÃO INFORMADO',
               optante_simples: isSimples,
               optante_simei: isSimei,
-              uf: data.uf || 'MT',
-              municipio: data.municipio || 'Cuiabá',
+              uf: data.uf,
+              municipio: data.municipio,
               cnae_principal_codigo: cnaePrincipal?.cnae,
               cnae_principal_descricao: cnaePrincipal?.descricao,
-              situacao_cadastral: data.situacaoCadastral || 'ATIVA',
+              situacao_cadastral: data.situacaoCadastral || data.situacao || 'ATIVA',
               fonte_api: 'OpenCNPJ'
-            });
+            };
+
+            if (porte) return res.status(200).json(openCnpjFallback);
           }
         }
       } catch (e) {
@@ -49,17 +53,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 2. Fallback BrasilAPI
-    const brasilRes = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanDigits}`);
-    if (brasilRes.ok) {
+    let brasilRes: Response | null = null;
+    try {
+      brasilRes = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanDigits}`);
+    } catch (error) {
+      if (!openCnpjFallback) throw error;
+    }
+
+    if (brasilRes?.ok) {
       const data = await brasilRes.json();
       const isSimei = Boolean(data.opcao_pelo_mei);
       const porte = normalizarPorteFiscal(data.porte, isSimei);
+
+      if (!data.cnpj && !data.razao_social && !data.nome_fantasia) {
+        return res.status(502).json({ error: 'A API de CNPJ retornou uma resposta incompleta. Tente novamente.' });
+      }
 
       return res.status(200).json({
         cnpj: data.cnpj,
         razao_social: data.razao_social,
         nome_fantasia: data.nome_fantasia || data.razao_social,
-        porte: porte || 'DEMAIS',
+        porte: porte || 'NÃO INFORMADO',
         optante_simples: Boolean(data.opcao_pelo_simples) || isSimei,
         optante_simei: isSimei,
         uf: data.uf,
@@ -71,7 +85,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    return res.status(404).json({ error: 'CNPJ não encontrado nas APIs' });
+    if (openCnpjFallback) return res.status(200).json(openCnpjFallback);
+
+    if (brasilRes?.status === 404) {
+      return res.status(404).json({ error: 'CNPJ não encontrado nas APIs consultadas.' });
+    }
+
+    return res.status(503).json({ error: 'As APIs de consulta de CNPJ estão temporariamente indisponíveis. Tente novamente.' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Erro ao consultar CNPJ' });
   }
