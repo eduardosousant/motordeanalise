@@ -10,6 +10,7 @@ import { FiscalPrintReport } from './components/FiscalPrintReport.tsx';
 import { Sidebar, ActiveModule } from './components/Sidebar.tsx';
 import { AluguelModule } from './components/AluguelModule.tsx';
 import { ComparadorOrcamentosSection } from './components/ComparadorOrcamentosSection.tsx';
+import { EmailAdiantamentoModule } from './components/EmailAdiantamentoModule.tsx';
 import { SpreadsheetImportReviewModal } from './components/SpreadsheetImportReviewModal.tsx';
 import {
     OperacaoComercial,
@@ -35,7 +36,7 @@ const INITIAL_OPERACAO: OperacaoComercial = {
     uf_destino: 'MT',
     ncm: '3209.10.00',
     descricao_produto: 'Tinta acrílica fosca para exteriores galao 18L',
-    finalidade_compra: 'ORGAO_PUBLICO_CONSUMO',
+    finalidade_compra: 'SUPRIMENTO_FUNDOS',
     tipo_adquirente: 'ORGAO_PUBLICO_ESTADUAL',
     valor_operacao: 15000,
     valor_frete: 0,
@@ -396,7 +397,7 @@ export default function App() {
             <div className="flex-1 flex flex-col min-w-0 min-h-screen">
                 {/* O Header foi removido daqui da raiz para não aparecer em todos os módulos */}
 
-                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 print:hidden">
+                <main className={`flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 ${activeModule === 'EMAIL_ADIANTAMENTO' ? '' : 'print:hidden'}`}>
                     {/* Barra de Seleção de Temas */}
                     {showThemeBar && (
                         <ThemeSwitcherBar
@@ -518,6 +519,10 @@ export default function App() {
                     {/* RENDERIZAÇÃO DO MÓDULO 4: COMPARADOR DE ORÇAMENTOS & ART. 18-B */}
                     {activeModule === 'COMPARADOR_ORCAMENTOS' && (
                             <ComparadorOrcamentosSection />
+                    )}
+
+                    {activeModule === 'EMAIL_ADIANTAMENTO' && (
+                        <EmailAdiantamentoModule />
                     )}
                 </main>
 
