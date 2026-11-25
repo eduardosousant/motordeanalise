@@ -131,9 +131,6 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">1. Dados Cadastrais do Fornecedor</h2>
-              <p className="text-xs text-slate-500">
-                Consulta em tempo real via dados abertos da Receita Federal
-              </p>
             </div>
           </div>
 
@@ -156,7 +153,7 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({
         <div className="space-y-3.5">
           <div>
             <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">
-              CNPJ do Fornecedor / Remetente
+              CNPJ do Fornecedor
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">

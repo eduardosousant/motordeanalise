@@ -98,9 +98,9 @@ export const Header: React.FC<HeaderProps> = ({
       default:
         return {
           icon: <span className="font-bold text-sm">MT</span>,
-          titulo: 'Motor Tributário SEFAZ/MT',
-          badgeText: 'Dec. 2.212/2014',
-          subtitulo: 'Enquadramento ICMS & Retenções em Compras Públicas (CGE-MT)',
+          titulo: 'Motor Tributário',
+          badgeText: 'SEFAZ/MT',
+          subtitulo: 'Retenções em Compras Públicas',
           logoColor: s.logoBg
         };
     }
@@ -225,21 +225,12 @@ export const Header: React.FC<HeaderProps> = ({
 
                   <button
                       type="button"
-                      onClick={onPrint}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${s.btnNeutral}`}
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Imprimir</span>
-                  </button>
-
-                  <button
-                      type="button"
                       onClick={onExportPdf}
                       disabled={isExportingPdf}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${s.btnPdf}`}
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>{isExportingPdf ? 'Gerando...' : 'Exportar PDF'}</span>
+                    <span>{isExportingPdf ? 'Gerando...' : 'PDF'}</span>
                   </button>
 
                   <button
@@ -248,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${s.btnNeutral}`}
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Nova Consulta</span>
+                    <span className="hidden sm:inline">Nova</span>
                   </button>
                 </>
             )}
