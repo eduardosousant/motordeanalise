@@ -298,13 +298,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                 <span className="text-[10.5px] text-emerald-800 block mt-0.5">Liquidação da despesa</span>
               </div>
 
-              <div className="bg-white border-l-4 border-teal-600 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                <span className="text-[10px] font-mono uppercase text-teal-800 font-semibold block tracking-wider">Total ICMS a Recolher MT</span>
-                <span className="text-sm sm:text-base font-bold text-teal-700 mt-1 block font-mono">
-                  {(simulacao.total_recolher_mt || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-                <span className="text-[10.5px] text-slate-500 block mt-0.5">Via DAR-1 / GNRE MT</span>
-              </div>
             </div>
 
             {/* Resumo Fornecedor & Impacto do Porte */}
@@ -441,13 +434,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                 <span className="text-[10.5px] text-emerald-800 block mt-0.5">Liquidação total da nota</span>
               </div>
 
-              <div className="bg-white border-l-4 border-teal-600 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                <span className="text-[10px] font-mono uppercase text-teal-800 font-semibold block tracking-wider">Total ICMS a Recolher MT</span>
-                <span className="text-sm sm:text-base font-bold text-teal-700 mt-1 block font-mono">
-                  {(consolidado.resumoConsolidado.total_recolher_mt || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-                <span className="text-[10.5px] text-slate-500 block mt-0.5">Via DAR-1 / GNRE MT</span>
-              </div>
             </div>
 
             {/* Tabela Detalhada com os Itens da Nota */}
@@ -459,9 +445,6 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
                     Grade e Enquadramento Fiscal dos Produtos ({consolidado.itensAnalise.length} itens)
                   </h4>
                 </div>
-                <span className="text-xs font-mono font-bold bg-teal-50 text-teal-800 px-2.5 py-1 rounded border border-teal-200">
-                  Total ICMS a Recolher MT: {consolidado.resumoConsolidado.total_icms_recolher_mt.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
               </div>
 
               <div className="overflow-x-auto">
