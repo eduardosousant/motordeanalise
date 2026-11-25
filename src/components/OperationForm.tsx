@@ -82,5 +82,6 @@ export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange
           {loading ? <><Calculator className="w-5 h-5 animate-spin" /><span>Processando análise fiscal...</span></> : <><Play className="w-4 h-4 fill-current" /><span>{itensAtuais.length > 1 ? `Gerar análise consolidada dos ${itensAtuais.length} itens` : 'Gerar análise tributária completa'}</span></>}
         </button>
       </div>
+    </div>
   );
-};
+}
