@@ -20,8 +20,9 @@ import {
   Layers,
   ArrowRight
 } from 'lucide-react';
-import { AnaliseTributariaJSON, SimulacaoMemoriaCalculo, AppTheme, AnaliseConsolidadaNota } from '../types.js';
+import { AnaliseTributariaJSON, SimulacaoMemoriaCalculo, AppTheme, AnaliseConsolidadaNota, FinalidadeCompra } from '../types.js';
 import { getCstInfo, isCombustivelMonofasico } from '../lib/taxCalculations.js';
+import { isSuprimentoFundos, SUPRIMENTO_FUNDOS_TEXT } from '../lib/suprimentoFundos.js';
 
 interface AnalysisResultViewProps {
   data: AnaliseTributariaJSON;
@@ -30,6 +31,7 @@ interface AnalysisResultViewProps {
   fonteAnalise?: 'CACHE_AI_LOCAL' | 'GEMINI_AI_AO_VIVO' | 'MOTOR_DETERMINISTICO_LOCAL';
   currentTheme?: AppTheme;
   consolidado?: AnaliseConsolidadaNota | null;
+  finalidadeCompra?: FinalidadeCompra;
 }
 
 export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
@@ -38,14 +40,18 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
   optanteSimples,
   fonteAnalise,
   currentTheme = 'GOV_CLASSIC',
-  consolidado
+  consolidado,
+  finalidadeCompra
 }) => {
   const [activeTab, setActiveTab] = useState<'EXECUTIVA' | 'GRADE_ITENS' | 'LEGAL' | 'CALCULO' | 'DEBUG'>('EXECUTIVA');
   const [copied, setCopied] = useState(false);
   const temMultiplosItens = Boolean(consolidado && consolidado.itensAnalise && consolidado.itensAnalise.length > 1);
+  const isSuprimento = isSuprimentoFundos(finalidadeCompra);
   const isOptanteSimples = optanteSimples ?? data.resumo_fornecedor.optante_simples;
   const isCombustivelMono = isCombustivelMonofasico(data.enquadramento_produto.ncm);
-  const orientacaoFiscal = isCombustivelMono && !temMultiplosItens
+  const orientacaoFiscal = isSuprimento
+    ? SUPRIMENTO_FUNDOS_TEXT
+    : isCombustivelMono && !temMultiplosItens
     ? `TRIBUTAÇÃO MONOFÁSICA DE COMBUSTÍVEIS: O NCM ${data.enquadramento_produto.ncm} enquadra o item no grupo monofásico. Não utilizar CST 40 nem aplicar desconto de ICMS desonerado do Art. 65. O faturamento deve ocorrer pelo VALOR INTEGRAL da proposta; esta análise não sugere um CST específico.`
     : data.orientacao_fiscal;
 
@@ -281,7 +287,9 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
               </div>
 
               <div className="bg-white border-l-4 border-sky-600 border-y border-r border-slate-200 p-3.5 rounded-r shadow-xs">
-                <span className="text-[10px] font-mono uppercase text-sky-800 font-semibold block tracking-wider">Retenção IRRF (IN 1234)</span>
+                <span className="text-[10px] font-mono uppercase text-sky-800 font-semibold block tracking-wider">
+                  {isSuprimento ? 'IRRF dispensado (Suprimento de Fundos)' : 'Retenção IRRF (IN 1234)'}
+                </span>
                 <span className="text-sm sm:text-base font-bold text-sky-700 mt-1 block font-mono">
                   {simulacao.valor_irrf_retido ? `- ${(simulacao.valor_irrf_retido).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : 'R$ 0,00'}
                 </span>
@@ -334,7 +342,7 @@ export const AnalysisResultView: React.FC<AnalysisResultViewProps> = ({
               <div className="bg-slate-900 text-white rounded-lg p-4 border border-slate-700 shadow-md space-y-2">
                 <div className="flex items-center justify-between border-b border-slate-700 pb-2">
                   <span className="text-xs font-mono font-bold text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Scale className="w-4 h-4 text-sky-400" /> Retenção na Fonte de IRRF — IN RFB nº 1.234/2012 & STF Tema 1130
+                    <Scale className="w-4 h-4 text-sky-400" /> {isSuprimento ? 'Dispensa de IRRF — Suprimento de Fundos' : 'Retenção na Fonte de IRRF — IN RFB nº 1.234/2012 & STF Tema 1130'}
                   </span>
                   <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
                     Aquisição por Órgão Público
@@ -992,7 +1000,7 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                     {simulacao.aplica_irrf_in1234 !== undefined && (
                       <tr className={`hover:bg-sky-50/50 transition ${simulacao.aplica_irrf_in1234 ? 'bg-sky-50/30' : 'bg-slate-50/40'}`}>
                         <td className="py-3 px-4 font-semibold text-sky-950">
-                          {simulacao.is_glosa_administrativa ? '5.' : '4.'} Retenção na Fonte de IRRF (IN RFB nº 1.234/2012)
+                          {simulacao.is_glosa_administrativa ? '5.' : '4.'} {isSuprimento ? 'Dispensa de IRRF (Suprimento de Fundos)' : 'Retenção na Fonte de IRRF (IN RFB nº 1.234/2012)'}
                           <span className="block text-[10px] font-normal text-sky-800 font-sans">
                             {simulacao.categoria_irrf_in1234 || 'Aquisição de Bens por Órgão Público'}
                           </span>
@@ -1015,11 +1023,11 @@ ${simulacao.aplica_irrf_in1234 ? `6. Retenção IRRF IN 1234 (${simulacao.aliquo
                               ? 'bg-sky-100 text-sky-900 border-sky-300'
                               : 'bg-slate-100 text-slate-600 border-slate-200'
                           }`}>
-                            {simulacao.aplica_irrf_in1234 ? 'Retido p/ Órgão' : 'Isento (Simples)'}
+                            {simulacao.aplica_irrf_in1234 ? 'Retido p/ Órgão' : isSuprimento ? 'Dispensado (Suprimento)' : 'Isento (Simples)'}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-[11px] font-sans text-sky-900">
-                          {simulacao.is_glosa_administrativa ? 'Art. 2º, § 10 IN 1.234/12' : 'Art. 3º-A IN 1.234/12'}
+                          {isSuprimento ? 'Art. 4º, XXI IN 1.234/12' : simulacao.is_glosa_administrativa ? 'Art. 2º, § 10 IN 1.234/12' : 'Art. 3º-A IN 1.234/12'}
                         </td>
                       </tr>
                     )}

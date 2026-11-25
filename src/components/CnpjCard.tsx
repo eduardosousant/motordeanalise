@@ -154,62 +154,57 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({
         </div>
 
         <div className="space-y-3.5">
-          <div>
-            <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">
-              CNPJ do Fornecedor / Remetente
-            </label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-[230px_minmax(0,1fr)] gap-3">
+            <div>
+              <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">
+                CNPJ do Fornecedor
+              </label>
+              <div className="flex gap-2">
                 <input
                     type="text"
                     value={cnpjInput}
                     onChange={handleInputChange}
                     placeholder="00.000.000/0000-00"
-                    className={`w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 transition ${themeStyle.focusRing}`}
+                    className={`min-w-0 flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 transition ${themeStyle.focusRing}`}
                 />
+                <button
+                    type="button"
+                    onClick={() => handleSearch()}
+                    disabled={loading}
+                    title="Consultar CNPJ"
+                    aria-label="Consultar CNPJ"
+                    className={`w-11 py-2.5 font-bold text-xs rounded flex items-center justify-center transition shadow-sm disabled:opacity-50 cursor-pointer flex-shrink-0 ${themeStyle.btnSearch}`}
+                >
+                  {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                </button>
               </div>
-              <button
-                  type="button"
-                  onClick={() => handleSearch()}
-                  disabled={loading}
-                  className={`px-4 py-2.5 font-bold text-xs rounded flex items-center gap-2 transition shadow-sm disabled:opacity-50 cursor-pointer flex-shrink-0 ${themeStyle.btnSearch}`}
-              >
-                {loading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Consultando...</span>
-                    </>
-                ) : (
-                    <>
-                      <Search className="w-4 h-4" />
-                      <span>Consultar CNPJ</span>
-                    </>
-                )}
-              </button>
             </div>
-            {error && (
-                <div className="mt-2 text-xs text-rose-800 flex items-center gap-1.5 bg-rose-50 border border-rose-200 p-2.5 rounded">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600" />
-                  <span>{error}</span>
-                </div>
-            )}
+
+            <div>
+              <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">
+                Razão Social
+              </label>
+              <div className="min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded flex items-center">
+                {currentSupplier ? (
+                  <div className="min-w-0">
+                    <span className="block truncate font-bold text-slate-900 text-sm">{currentSupplier.razao_social}</span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-slate-400">Preenchida após consultar o CNPJ</span>
+                )}
+              </div>
+            </div>
           </div>
+          {error && (
+            <div className="mt-2 text-xs text-rose-800 flex items-center gap-1.5 bg-rose-50 border border-rose-200 p-2.5 rounded">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600" />
+              <span>{error}</span>
+            </div>
+          )}
 
           {currentSupplier && (
               <div className="bg-slate-50 border border-slate-200/90 rounded-lg p-4 text-xs space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
-                  <div>
-                    <span className="text-[10px] uppercase font-mono tracking-widest text-slate-500 block font-semibold">Razão Social</span>
-                    <span className="font-bold text-slate-900 text-sm">{currentSupplier.razao_social}</span>
-                    {currentSupplier.nome_fantasia && (
-                        <span className="text-slate-600 block text-xs">({currentSupplier.nome_fantasia})</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white border border-slate-200 text-teal-800 px-2.5 py-1 rounded text-[11px] font-mono shadow-2xs">
-                    <Server className="w-3 h-3 text-teal-600" />
-                    <span>API: {currentSupplier.fonte_api}</span>
-                  </div>
-                </div>
+
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
