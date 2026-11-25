@@ -16,8 +16,8 @@ const UFS = ['SP','PR','RJ','SC','MG','RS','DF','GO','MS','BA','PE','CE','PA','E
 
 export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange, onSubmit, loading, supplier, currentTheme = 'GOV_CLASSIC' }) => {
   const itensAtuais: ItemNotaFiscal[] = operacao.itens && operacao.itens.length > 0
-    ? operacao.itens
-    : [{ id: 'item_1', ncm: operacao.ncm || '3209.10.00', descricao: operacao.descricao_produto || '', quantidade: 1, valor_unitario: operacao.valor_operacao || 0, valor_total: operacao.valor_operacao || 0, valor_desconto_comercial: operacao.valor_desconto_comercial || 0, valor_frete: operacao.valor_frete || 0, valor_despesas: operacao.valor_despesas || 0, icms_proprio_destacado: operacao.icms_proprio_destacado || 0 }];
+      ? operacao.itens
+      : [{ id: 'item_1', ncm: operacao.ncm || '3209.10.00', descricao: operacao.descricao_produto || '', quantidade: 1, valor_unitario: operacao.valor_operacao || 0, valor_total: operacao.valor_operacao || 0, valor_desconto_comercial: operacao.valor_desconto_comercial || 0, valor_frete: operacao.valor_frete || 0, valor_despesas: operacao.valor_despesas || 0, icms_proprio_destacado: operacao.icms_proprio_destacado || 0 }];
 
   const handleMultiItensChange = (newItens: ItemNotaFiscal[]) => {
     const primeiro = newItens[0];
@@ -82,6 +82,5 @@ export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange
           {loading ? <><Calculator className="w-5 h-5 animate-spin" /><span>Processando análise fiscal...</span></> : <><Play className="w-4 h-4 fill-current" /><span>{itensAtuais.length > 1 ? `Gerar análise consolidada dos ${itensAtuais.length} itens` : 'Gerar análise tributária completa'}</span></>}
         </button>
       </div>
-    </div>
   );
 };

@@ -131,9 +131,6 @@ export const CnpjCard: React.FC<CnpjCardProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-900 tracking-tight">1. Dados Cadastrais do Fornecedor</h2>
-              <p className="text-xs text-slate-500">
-                Consulta em tempo real via dados abertos da Receita Federal
-              </p>
             </div>
           </div>
 
