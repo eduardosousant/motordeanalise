@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-11-25T04:28:11.813Z",
-  "totalEntries": 48,
+  "updatedAt": "2026-11-25T05:16:47.923Z",
+  "totalEntries": 49,
   "entries": {
     "32091000_SP_MT_SIMPLES_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO": {
       "cacheKey": "32091000_SP_MT_SIMPLES_EPP_ORGAO_PUBLICO_ESTADUAL_ORGAO_PUBLICO_CONSUMO",
@@ -2160,6 +2160,51 @@
           }
         ],
         "orientacao_fiscal": "CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026 & Conv. 73/04): 1) REGIME NORMAL SEM ST (CST 40): Isenção de ICMS OBRIGATÓRIA com desconto destacado em 'vICMSDesonerado' (17%). 2) Retenção na fonte de IRRF de 1.20% (Bens e Mercadorias em Geral (IN 1234 - Cód. 8767)) sobre o valor faturado com desconto."
+      }
+    },
+    "32091000_SP_MT_SIMPLES_EPP_ORGAO_PUBLICO_ESTADUAL_SUPRIMENTO_FUNDOS": {
+      "cacheKey": "32091000_SP_MT_SIMPLES_EPP_ORGAO_PUBLICO_ESTADUAL_SUPRIMENTO_FUNDOS",
+      "createdAt": "2026-11-25T05:16:47.920Z",
+      "ncm": "3209.10.00",
+      "ufOrigem": "SP",
+      "ufDestino": "MT",
+      "simplesRemetente": true,
+      "porteRemetente": "EPP",
+      "finalidadeCompra": "SUPRIMENTO_FUNDOS",
+      "tipoAdquirente": "ORGAO_PUBLICO_ESTADUAL",
+      "origemAi": false,
+      "jsonResponse": {
+        "status_analise": "SUCESSO",
+        "resumo_fornecedor": {
+          "cnpj": "60701190000104",
+          "porte": "EPP",
+          "optante_simples": true,
+          "impacto_tributario_porte": "Fornecedor enquadrado no EPP (Optante pelo Simples Nacional). CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica ao Simples Nacional. 2) A Nota Fiscal apresentada deve ser emitida pelo VALOR INTEGRAL da proposta, sem desconto de ICMS. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012)."
+        },
+        "enquadramento_produto": {
+          "ncm": "3209.10.00",
+          "descricao": "Tinta acrílica fosca para exteriores galao 18L",
+          "regime_tributario_aplicavel": "Substituição Tributária",
+          "cst_codigo": "500"
+        },
+        "aliquotas": {
+          "aliquota_origem": "7%",
+          "aliquota_interna_mt": "17%",
+          "mva_ou_pauta": "CSOSN 500 (ST Antecipada)"
+        },
+        "fundamentacao_legal": [
+          {
+            "artigo_anexo": "Orientação Técnica nº 03/2026 - CGE/MT & LC 123/2006",
+            "dispositivo": "Cartilha de Execução Financeira CGE-MT / RICMS-MT",
+            "resumo_regra": "Conforme a OT CGE 03/2026, a isenção de ICMS do Art. 65 Anexo IV NÃO se aplica a fornecedores optantes pelo Simples Nacional. A nota é emitida pelo valor integral da proposta, sem desconto de 17% (CSOSN 102 ou 500)."
+          },
+          {
+            "artigo_anexo": "Art. 4º, XI da IN RFB nº 1.234/2012",
+            "dispositivo": "Instrução Normativa RFB nº 1.234/2012",
+            "resumo_regra": "Dispensa de retenção na fonte do IRRF para empresas optantes pelo Simples Nacional nos pagamentos efetuados por órgãos públicos."
+          }
+        ],
+        "orientacao_fiscal": "CONFORMIDADE FINANCEIRA DE COMPRAS PÚBLICAS (OT CGE-MT nº 03/2026): 1) FORNECEDOR SIMPLES NACIONAL (CSOSN 500): A isenção de ICMS do Art. 65 do Anexo IV NÃO se aplica ao Simples Nacional. 2) A Nota Fiscal apresentada deve ser emitida pelo VALOR INTEGRAL da proposta, sem desconto de ICMS. 3) Dispensa de retenção de IRRF (Art. 4º, XI da IN RFB nº 1.234/2012)."
       }
     }
   }
