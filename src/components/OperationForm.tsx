@@ -34,54 +34,53 @@ export const OperationForm: React.FC<OperationFormProps> = ({ operacao, onChange
   };
 
   return (
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800"><Package className="w-5 h-5" /></div>
-            <div><h2 className="text-sm font-bold text-slate-900 tracking-tight">2. Dados da Operação Comercial (MT)</h2><p className="text-xs text-slate-500">NCMs, produtos, rota fiscal, valores da nota e finalidade de uso</p></div>
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm p-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div className="flex items-center space-x-2.5">
+          <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800"><Package className="w-5 h-5" /></div>
+          <div><h2 className="text-sm font-bold text-slate-900 tracking-tight">2. Dados da Operação Comercial (MT)</h2><p className="text-xs text-slate-500">NCMs, produtos, rota fiscal, valores da nota e finalidade de uso</p></div>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-800 text-white text-xs font-bold shadow">
+          <ListPlus className="w-3.5 h-3.5" /> Itens ({itensAtuais.length})
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">Tipo do Adquirente</label>
+            <select value={operacao.tipo_adquirente || 'ORGAO_PUBLICO_ESTADUAL'} onChange={(e) => onChange({ tipo_adquirente: e.target.value as OperacaoComercial['tipo_adquirente'] })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
+              <option value="ORGAO_PUBLICO_ESTADUAL">Órgão Público Estadual</option>
+              <option value="PRIVADO">Empresa Privada / Contribuinte / Comércio</option>
+            </select>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-800 text-white text-xs font-bold shadow">
-            <ListPlus className="w-3.5 h-3.5" /> Itens ({itensAtuais.length})
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">Finalidade da Compra</label>
+            <select value={operacao.finalidade_compra} onChange={(e) => {
+              const val = e.target.value as FinalidadeCompra;
+              onChange({ finalidade_compra: val, tipo_adquirente: val === 'ORGAO_PUBLICO_CONSUMO' || val === 'SUPRIMENTO_FUNDOS' ? 'ORGAO_PUBLICO_ESTADUAL' : operacao.tipo_adquirente });
+            }} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
+              <option value="ORGAO_PUBLICO_CONSUMO">Aquisição de Órgão Público Estadual</option>
+              <option value="SUPRIMENTO_FUNDOS" className="font-bold text-sky-900">Suprimentos de Fundos</option>
+              <option value="REVENDA">Revenda / Comercialização</option>
+              <option value="USO_CONSUMO">Uso e Consumo Privado</option>
+              <option value="ATIVO_IMOBILIZADO">Ativo Imobilizado Privado</option>
+              <option value="INDUSTRIALIZACAO">Industrialização / Insumo</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">UF Origem *</label>
+            <select value={operacao.uf_origem} onChange={(e) => onChange({ uf_origem: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
+              {UFS.map(uf => <option key={uf} value={uf}>{uf}{supplier?.uf === uf ? ' (Mesmo do Fornecedor)' : ''}</option>)}
+            </select>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">Tipo do Adquirente em MT *</label>
-              <select value={operacao.tipo_adquirente || 'ORGAO_PUBLICO_ESTADUAL'} onChange={(e) => onChange({ tipo_adquirente: e.target.value as OperacaoComercial['tipo_adquirente'] })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
-                <option value="ORGAO_PUBLICO_ESTADUAL">Órgão Público Estadual</option>
-                <option value="PRIVADO">Empresa Privada / Contribuinte / Comércio</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">Finalidade da Compra em MT *</label>
-              <select value={operacao.finalidade_compra} onChange={(e) => {
-                const val = e.target.value as FinalidadeCompra;
-                onChange({ finalidade_compra: val, tipo_adquirente: val === 'ORGAO_PUBLICO_CONSUMO' || val === 'SUPRIMENTO_FUNDOS' ? 'ORGAO_PUBLICO_ESTADUAL' : operacao.tipo_adquirente });
-              }} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
-                <option value="ORGAO_PUBLICO_CONSUMO">Aquisição de Órgão Público Estadual</option>
-                <option value="SUPRIMENTO_FUNDOS" className="font-bold text-sky-900">Suprimentos de Fundos</option>
-                <option value="REVENDA">Revenda / Comercialização</option>
-                <option value="USO_CONSUMO">Uso e Consumo Privado</option>
-                <option value="ATIVO_IMOBILIZADO">Ativo Imobilizado Privado</option>
-                <option value="INDUSTRIALIZACAO">Industrialização / Insumo</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-wider font-semibold text-slate-600 mb-1.5">UF Origem *</label>
-              <select value={operacao.uf_origem} onChange={(e) => onChange({ uf_origem: e.target.value })} className="w-full px-3.5 py-2.5 border border-slate-300 rounded text-xs font-semibold">
-                {UFS.map(uf => <option key={uf} value={uf}>{uf}{supplier?.uf === uf ? ' (Mesmo do Fornecedor)' : ''}</option>)}
-              </select>
-            </div>
-          </div>
+        <MultiItemManager itens={itensAtuais} onChangeItens={handleMultiItensChange} currentTheme={currentTheme} finalidadeCompra={operacao.finalidade_compra} />
 
-          <MultiItemManager itens={itensAtuais} onChangeItens={handleMultiItensChange} currentTheme={currentTheme} finalidadeCompra={operacao.finalidade_compra} />
-
-          <button type="button" onClick={onSubmit} disabled={loading} className="w-full py-3.5 px-5 font-bold text-xs rounded-lg flex items-center justify-center gap-2 bg-emerald-700 text-white">
-            {loading ? <><Calculator className="w-5 h-5 animate-spin" /><span>Processando análise fiscal...</span></> : <><Play className="w-4 h-4 fill-current" /><span>{itensAtuais.length > 1 ? `Gerar análise consolidada dos ${itensAtuais.length} itens` : 'Gerar análise tributária completa'}</span></>}
-          </button>
-        </div>
+        <button type="button" onClick={onSubmit} disabled={loading} className="w-full py-3.5 px-5 font-bold text-xs rounded-lg flex items-center justify-center gap-2 bg-emerald-700 text-white">
+          {loading ? <><Calculator className="w-5 h-5 animate-spin" /><span>Processando análise fiscal...</span></> : <><Play className="w-4 h-4 fill-current" /><span>{itensAtuais.length > 1 ? `Gerar análise consolidada dos ${itensAtuais.length} itens` : 'Gerar análise tributária completa'}</span></>}
+        </button>
       </div>
   );
 };

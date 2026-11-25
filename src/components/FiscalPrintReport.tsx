@@ -46,6 +46,24 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
 
     const isGlosa = Boolean(simulacao.is_glosa_administrativa || (consolidado && consolidado.resumoConsolidado.total_glosa_icms > 0));
     const valorGlosa = simulacao.valor_glosa_icms || (consolidado ? consolidado.resumoConsolidado.total_glosa_icms : 0);
+    const temDescontoComercial = Boolean(consolidado?.resumoConsolidado.total_desconto_comercial);
+    const legendaEnquadramento = consolidado
+        ? [...new Map(consolidado.itensAnalise.map(it => {
+            const itemIsGlosa = Boolean(it.simulacao.is_glosa_administrativa);
+            const isItemMonofasico = isCombustivelMonofasico(it.item.ncm);
+            const cstInfo = (!isItemMonofasico && (itemIsGlosa || (it.simulacao.desconto_isencao_orgao_publico && it.simulacao.desconto_isencao_orgao_publico > 0)))
+                ? { codigo: '40', tipo: 'CST' as const, descricao: 'Isenta c/ Desconto Obrigatório' }
+                : getCstInfo(it.jsonResponse, it.simulacao, isOptanteSimples);
+            const codigo = isItemMonofasico && it.item.cst ? String(it.item.cst).trim() : cstInfo.codigo;
+            const tipo = cstInfo.tipo === 'CSOSN' ? 'CSOSN' : cstInfo.tipo === 'CST' ? 'CST' : 'Regime';
+            const descricao = codigo === '60'
+                ? 'Substituição tributária'
+                : codigo === '40'
+                    ? 'Isento (Órgão Público MT)'
+                    : cstInfo.descricao;
+            return [`${tipo} ${codigo}`, `${tipo} ${codigo} - ${descricao}`] as const;
+        })).values()]
+        : [];
 
     // Itens monofásicos não recebem CST 40 nem sugestão de CST nesta análise.
     const cstCalculado = (isCombustivelMono && !temMultiplosItens)
@@ -86,7 +104,9 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
             {
                 artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
                 dispositivo: "Instrução Normativa RFB nº 1.234/2012 (Art. 2º, § 10 c/c Art. 3º-A)",
-                resumo_regra: isOptanteSimples
+                resumo_regra: operacao.finalidade_compra === 'SUPRIMENTO_FUNDOS'
+                    ? "Dispensa de retenção na fonte do IRRF e das contribuições sociais federais para aquisição por Suprimento de Fundos."
+                    : isOptanteSimples
                     ? "Dispensa de retenção na fonte do IRRF para fornecedor optante pelo Simples Nacional (Art. 4º, XI)."
                     : isGlosa
                         ? "Instrução Normativa RFB nº 1.234/2012, Art. 2º, § 10: “§ 10. Em caso de pagamentos com glosa de valores constantes da nota fiscal, sem emissão de nova nota fiscal, a retenção deverá incidir sobre o valor original da nota.”"
@@ -347,10 +367,9 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                 <th style={{ padding: '6px 8px', fontWeight: 700 }}>Descrição da Mercadoria</th>
                                 <th style={{ padding: '6px 4px', textAlign: 'center', width: '26px', fontWeight: 700, whiteSpace: 'nowrap' }}>Qtd</th>
                                 <th style={{ padding: '6px 6px', textAlign: 'right', width: '70px', fontWeight: 700, whiteSpace: 'nowrap' }}>Valor Bruto</th>
-                                <th style={{ padding: '6px 6px', textAlign: 'right', width: '72px', color: '#b45309', fontWeight: 700, whiteSpace: 'nowrap' }}>Desc. Com.</th>
-                                <th style={{ padding: '6px 6px', width: '80px', fontWeight: 700 }}>Regime MT</th>
+                                {temDescontoComercial && <th style={{ padding: '6px 6px', textAlign: 'right', width: '72px', color: '#b45309', fontWeight: 700, whiteSpace: 'nowrap' }}>Desc. Com.</th>}
                                 <th style={{ padding: '6px 6px', textAlign: 'right', width: '70px', fontWeight: 700, whiteSpace: 'nowrap' }}>Desc./Glosa ICMS</th>
-                                <th style={{ padding: '6px 6px', textAlign: 'right', width: '65px', fontWeight: 700, whiteSpace: 'nowrap' }}>IRRF</th>
+                                <th style={{ padding: '6px 6px', textAlign: 'right', width: '65px', fontWeight: 700, whiteSpace: 'nowrap' }}>IRRF Retido</th>
                                 <th style={{ padding: '6px 8px', textAlign: 'right', width: '75px', fontWeight: 700, whiteSpace: 'nowrap' }}>Líquido Pagar</th>
                             </tr>
                             </thead>
@@ -407,19 +426,16 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                         <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 600, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                                             {formatMoney(valorBrutoItem)}
                                         </td>
-                                        <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b45309', fontWeight: it.item.valor_desconto_comercial ? 700 : 400, whiteSpace: 'nowrap' }}>
-                                            {it.item.valor_desconto_comercial ? `- ${formatMoney(it.item.valor_desconto_comercial)}` : '-'}
-                                        </td>
-                                        <td style={{ padding: '5px 6px', fontSize: '8px', color: '#475569', lineHeight: 1.2 }}>
-                                            {it.jsonResponse.enquadramento_produto.regime_tributario_aplicavel}
-                                        </td>
+                                        {temDescontoComercial && (
+                                            <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b45309', fontWeight: it.item.valor_desconto_comercial ? 700 : 400, whiteSpace: 'nowrap' }}>
+                                                {it.item.valor_desconto_comercial ? `- ${formatMoney(it.item.valor_desconto_comercial)}` : '-'}
+                                            </td>
+                                        )}
                                         <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', color: abatimentoItem ? '#b45309' : '#94a3b8', fontWeight: abatimentoItem ? 700 : 400, whiteSpace: 'nowrap' }}>
                                             {abatimentoItem ? `- ${formatMoney(abatimentoItem)}` : 'R$ 0,00'}
                                         </td>
                                         <td style={{ padding: '5px 6px', textAlign: 'right', fontFamily: 'monospace', color: it.simulacao.valor_irrf_retido ? '#b91c1c' : '#94a3b8', fontWeight: it.simulacao.valor_irrf_retido ? 700 : 400, whiteSpace: 'nowrap' }}>
-                                            {it.simulacao.valor_irrf_calculado !== undefined
-                                                ? `${formatMoney(it.simulacao.valor_irrf_calculado)} / - ${formatMoney(it.simulacao.valor_irrf_retido || 0)}`
-                                                : (it.simulacao.valor_irrf_retido ? `- ${formatMoney(it.simulacao.valor_irrf_retido)}` : 'R$ 0,00')}
+                                            {it.simulacao.valor_irrf_retido ? `- ${formatMoney(it.simulacao.valor_irrf_retido)}` : 'R$ 0,00'}
                                         </td>
                                         <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#065f46', backgroundColor: '#f0fdf4', whiteSpace: 'nowrap' }}>
                                             {formatMoney(liquidoItem)}
@@ -436,18 +452,19 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                                 <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#0f172a', whiteSpace: 'nowrap' }}>
                                     {formatMoney(consolidado.resumoConsolidado.total_valor_bruto)}
                                 </td>
-                                <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b45309', whiteSpace: 'nowrap' }}>
-                                    {consolidado.resumoConsolidado.total_desconto_comercial > 0 ? `- ${formatMoney(consolidado.resumoConsolidado.total_desconto_comercial)}` : '-'}
-                                </td>
-                                <td></td>
+                                {temDescontoComercial && (
+                                    <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b45309', whiteSpace: 'nowrap' }}>
+                                        {`- ${formatMoney(consolidado.resumoConsolidado.total_desconto_comercial)}`}
+                                    </td>
+                                )}
                                 <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b45309', whiteSpace: 'nowrap' }}>
                                     {(consolidado.resumoConsolidado.total_desconto_isencao_icms + consolidado.resumoConsolidado.total_glosa_icms) > 0
                                         ? `- ${formatMoney(consolidado.resumoConsolidado.total_desconto_isencao_icms + consolidado.resumoConsolidado.total_glosa_icms)}`
                                         : 'R$ 0,00'}
                                 </td>
                                 <td style={{ padding: '6px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#b91c1c', whiteSpace: 'nowrap' }}>
-                                    {consolidado.resumoConsolidado.total_irrf_calculado > 0
-                                        ? `${formatMoney(consolidado.resumoConsolidado.total_irrf_calculado)} / - ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)}`
+                                    {consolidado.resumoConsolidado.total_irrf_retido > 0
+                                        ? `- ${formatMoney(consolidado.resumoConsolidado.total_irrf_retido)}`
                                         : 'R$ 0,00'}
                                 </td>
                                 <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#065f46', backgroundColor: '#dcfce7', fontSize: '10px', whiteSpace: 'nowrap' }}>
@@ -456,6 +473,12 @@ export const FiscalPrintReport: React.FC<FiscalPrintReportProps> = ({
                             </tr>
                             </tfoot>
                         </table>
+                        {legendaEnquadramento.length > 0 && (
+                            <div style={{ padding: '6px 8px', borderTop: '1px solid #e2e8f0', fontSize: '8px', color: '#475569', lineHeight: 1.4 }}>
+                                <strong style={{ color: '#334155' }}>Legenda de CST/CSOSN: </strong>
+                                {legendaEnquadramento.join(' | ')}
+                            </div>
+                        )}
                     </section>
                 ) : (
                     /* PRODUTO ÚNICO */

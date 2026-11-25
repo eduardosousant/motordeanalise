@@ -739,7 +739,9 @@ export function computeConsolidatedNotaLocal(op: OperacaoComercial): {
         {
           artigo_anexo: "IN RFB nº 1.234/2012 & STF Tema 1130 (RE 1.293.453)",
           dispositivo: "Instrução Normativa RFB nº 1.234/2012 (Art. 2º, § 10 c/c Art. 3º-A)",
-          resumo_regra: isSimples
+          resumo_regra: isSuprimentoFundos(op.finalidade_compra)
+              ? "Dispensa de retenção na fonte do IRRF e das contribuições sociais federais para aquisição por Suprimento de Fundos."
+              : isSimples
               ? "Dispensa de retenção na fonte do IRRF para fornecedor optante pelo Simples Nacional (Art. 4º, XI)."
               : "Retenção na fonte de IRRF item a item: base líquida para descontos formais (Art. 3º-A) ou base integral para pagamentos com glosa sem nova NF (Art. 2º, § 10)."
         }

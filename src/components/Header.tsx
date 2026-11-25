@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
           icon: <span className="font-bold text-sm">MT</span>,
           titulo: 'Motor Tributário',
           badgeText: 'SEFAZ/MT',
-          subtitulo: 'Retenções em Compras Públicas',
+          subtitulo: 'Retenções em Compras Públicas (MT)',
           logoColor: s.logoBg
         };
     }
@@ -222,6 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span className="hidden md:inline">XML da NF-e</span>
                     <span className="md:hidden">XML</span>
                   </button>
+
 
                   <button
                       type="button"

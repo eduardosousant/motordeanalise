@@ -22,6 +22,7 @@ import {
     ItemNotaFiscal
 } from './types.js';
 import { computeClientSimulation, computeConsolidatedNotaLocal, isCombustivelMonofasico } from './lib/taxCalculations.js';
+import { isSuprimentoFundos } from './lib/suprimentoFundos.js';
 import { parseNfeXml } from './lib/nfeXmlParser.js';
 import { AlertCircle, FileCheck, CheckCircle2, FileText } from 'lucide-react';
 
@@ -160,7 +161,11 @@ export default function App() {
                 data = computeConsolidatedNotaLocal(targetOp);
             }
 
-            if (isCombustivelMonofasico(targetOp.ncm) || targetOp.itens?.some(item => isCombustivelMonofasico(item.ncm))) {
+            if (
+                isSuprimentoFundos(targetOp.finalidade_compra) ||
+                isCombustivelMonofasico(targetOp.ncm) ||
+                targetOp.itens?.some(item => isCombustivelMonofasico(item.ncm))
+            ) {
                 data = computeConsolidatedNotaLocal(targetOp);
             }
 
@@ -317,7 +322,12 @@ export default function App() {
         setOperacao(prev => {
             const nextOp = { ...prev, ...updated };
             if (result?.jsonResponse) {
-                if (isCombustivelMonofasico(nextOp.ncm) || nextOp.itens?.some(item => isCombustivelMonofasico(item.ncm))) {
+                if (
+                    isSuprimentoFundos(nextOp.finalidade_compra) ||
+                    (nextOp.itens?.length ?? 0) > 1 ||
+                    isCombustivelMonofasico(nextOp.ncm) ||
+                    nextOp.itens?.some(item => isCombustivelMonofasico(item.ncm))
+                ) {
                     setResult(computeConsolidatedNotaLocal(nextOp));
                 } else {
                     const nextSimulacao = computeClientSimulation(nextOp, result.jsonResponse);
@@ -477,6 +487,7 @@ export default function App() {
                                         fonteAnalise={result.fonteAnalise}
                                         currentTheme={theme}
                                         consolidado={result.consolidado}
+                                        finalidadeCompra={operacao.finalidade_compra}
                                     />
                                 </div>
                             )}
